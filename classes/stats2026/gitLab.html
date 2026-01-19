@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Git Lab: State, Flow, and Conflict</title>
+  <style>
+    :root{
+      --bg:#0b0d10;
+      --card:#12161b;
+      --text:#e7eef7;
+      --muted:#a8b3c2;
+      --accent:#7bdff2;
+      --accent2:#cdb4db;
+      --warn:#ffd166;
+      --ok:#95d5b2;
+      --border:#243041;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+    }
+    body{
+      margin:0;
+      font-family:var(--sans);
+      background:radial-gradient(1200px 700px at 20% 0%, rgba(123,223,242,.12), transparent 55%),
+                 radial-gradient(900px 600px at 90% 10%, rgba(205,180,219,.12), transparent 50%),
+                 var(--bg);
+      color:var(--text);
+      line-height:1.45;
+    }
+    header{
+      padding:40px 18px 18px;
+      max-width:980px;
+      margin:0 auto;
+    }
+    h1{margin:0 0 10px; font-size:clamp(26px, 4vw, 38px); letter-spacing:.2px;}
+    .subtitle{color:var(--muted); max-width:75ch;}
+    main{
+      max-width:980px;
+      margin:0 auto;
+      padding:18px;
+      display:grid;
+      gap:16px;
+    }
+    .card{
+      background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01));
+      border:1px solid var(--border);
+      border-radius:16px;
+      padding:18px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.22);
+    }
+    .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center;}
+    .pill{
+      display:inline-flex; align-items:center; gap:8px;
+      font-size:13px;
+      padding:6px 10px;
+      border-radius:999px;
+      border:1px solid var(--border);
+      background:rgba(255,255,255,.03);
+      color:var(--muted);
+    }
+    .pill b{color:var(--text); font-weight:650;}
+    h2{margin:0 0 10px; font-size:20px;}
+    h3{margin:16px 0 8px; font-size:16px; color:var(--text);}
+    p{margin:8px 0; color:var(--text);}
+    ul{margin:8px 0 0 20px; color:var(--text);}
+    li{margin:6px 0;}
+    .muted{color:var(--muted);}
+    .note{
+      border-left:4px solid var(--accent);
+      padding:10px 12px;
+      background:rgba(123,223,242,.06);
+      border-radius:10px;
+      color:var(--text);
+      margin-top:10px;
+    }
+    .warn{
+      border-left:4px solid var(--warn);
+      background:rgba(255,209,102,.08);
+    }
+    .ok{
+      border-left:4px solid var(--ok);
+      background:rgba(149,213,178,.08);
+    }
+    code, pre{
+      font-family:var(--mono);
+      font-size: 13px;
+    }
+    pre{
+      margin:10px 0;
+      padding:12px 14px;
+      border-radius:12px;
+      border:1px solid var(--border);
+      background:rgba(0,0,0,.35);
+      overflow:auto;
+    }
+    .grid{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap:12px;
+    }
+    @media (min-width: 860px){
+      .grid{grid-template-columns: 1.25fr .75fr;}
+    }
+    .checklist label{
+      display:flex; gap:10px; align-items:flex-start;
+      padding:10px 10px;
+      border:1px solid var(--border);
+      border-radius:12px;
+      background:rgba(255,255,255,.02);
+      margin:8px 0;
+    }
+    .checklist input{margin-top:4px;}
+    .qa textarea{
+      width:100%;
+      min-height:70px;
+      resize:vertical;
+      padding:10px 12px;
+      border-radius:12px;
+      border:1px solid var(--border);
+      background:rgba(0,0,0,.25);
+      color:var(--text);
+      font-family:var(--sans);
+    }
+    .mini{
+      font-size:12px;
+      color:var(--muted);
+    }
+    .kbd{
+      font-family:var(--mono);
+      font-size:12px;
+      padding:2px 6px;
+      border-radius:8px;
+      border:1px solid var(--border);
+      background:rgba(255,255,255,.03);
+      color:var(--text);
+      white-space:nowrap;
+    }
+    footer{
+      max-width:980px;
+      margin:0 auto;
+      padding:22px 18px 40px;
+      color:var(--muted);
+    }
+    @media print{
+      body{background:#fff; color:#000;}
+      .card{box-shadow:none; background:#fff; border:1px solid #ccc;}
+      pre{background:#f6f6f6; border:1px solid #ddd;}
+      .pill{background:#fff; color:#333; border:1px solid #ddd;}
+      .note{background:#f2fbfe;}
+      .warn{background:#fff8e8;}
+      .ok{background:#f1fbf4;}
+      textarea, input{display:none;}
+      .mini{display:none;}
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Git Lab: State, Flow, and Conflict</h1>
+    <p class="subtitle">
+      A hands-on exercise designed to make Git’s conceptual model stick:
+      <span class="kbd">state</span> (where files are) + <span class="kbd">flow</span> (which commands move them).
+      You will intentionally create a merge conflict and resolve it.
+    </p>
+    <div class="row">
+      <span class="pill"><b>Time:</b> 25–40 minutes</span>
+      <span class="pill"><b>Format:</b> pairs</span>
+      <span class="pill"><b>Tools:</b> Git, GitHub account, terminal</span>
+      <span class="pill"><b>Outcome:</b> one resolved conflict</span>
+    </div>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2>Learning goals</h2>
+      <ul>
+        <li>Identify <b>where your changes are</b>: working directory, staging area, local repo, remote repo.</li>
+        <li>Use <code>git status</code> to diagnose what to do next.</li>
+        <li>Experience a <b>merge conflict</b> and resolve it calmly.</li>
+      </ul>
+      <div class="note ok">
+        <b>Mindset:</b> a merge conflict is not an error. It’s Git refusing to guess what you mean.
+      </div>
+    </section>
+
+    <section class="card grid">
+      <div>
+        <h2>Roles</h2>
+        <p><b>Driver</b> types commands. <b>Observer</b> narrates what state you’re in and what each command does.</p>
+        <p class="muted">Switch roles after Part 2 (after both commits are made).</p>
+
+        <h3>The state + flow model (keep this in your head)</h3>
+        <pre><code>Working Directory → Staging → Local Repo → Remote Repo
+     git add         git commit      git push</code></pre>
+
+        <div class="note">
+          If you get lost, run <b><code>git status</code></b> and ask: “Which arrow am I on?”
+        </div>
+      </div>
+
+      <div class="checklist">
+        <h2>Quick checklist</h2>
+        <label><input type="checkbox" /> Both partners can log into GitHub</label>
+        <label><input type="checkbox" /> Both partners have Git installed</label>
+        <label><input type="checkbox" /> Both partners can run <code>git --version</code></label>
+        <label><input type="checkbox" /> You have agreed who starts as Driver</label>
+        <div class="mini">Checkboxes are for you. They won’t be saved.</div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Part 0: Setup (5 minutes)</h2>
+      <ol>
+        <li>Driver creates a new GitHub repo named <code>git-lab-yourname</code> (public or private is fine).</li>
+        <li>Driver adds Observer as a collaborator.</li>
+        <li>Both students clone the repo locally:</li>
+      </ol>
+      <pre><code>git clone https://github.com/&lt;username&gt;/git-lab-yourname.git
+cd git-lab-yourname</code></pre>
+
+      <div class="note">
+        <b>Checkpoint question:</b> Is your working directory currently empty but linked to a remote?
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Part 1: Normal workflow (confidence builder)</h2>
+      <p><b>Driver</b> creates <code>notes.txt</code> with exactly one line:</p>
+      <pre><code>This file belongs to science.</code></pre>
+
+      <p>Then run:</p>
+      <pre><code>git status
+git add notes.txt
+git commit -m "Add notes file"
+git push</code></pre>
+
+      <p><b>Observer</b> pulls the changes:</p>
+      <pre><code>git pull</code></pre>
+
+      <div class="note ok">
+        <b>Checkpoint questions:</b>
+        <ul>
+          <li>Where was the file before <code>git add</code>?</li>
+          <li>Where did it move after <code>git commit</code>?</li>
+          <li>Where is it after <code>git push</code>?</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Part 2: Divergence (the trap is set)</h2>
+      <p>Now both partners will edit the <b>same line</b> in <code>notes.txt</code> without pulling first.</p>
+
+      <div class="note warn">
+        <b>Important:</b> Do <u>not</u> run <code>git pull</code> before committing your edit.
+        This lab only works if histories diverge.
+      </div>
+
+      <h3>Driver change</h3>
+      <p>Change the line to:</p>
+      <pre><code>This file belongs to computational science.</code></pre>
+
+      <h3>Observer change</h3>
+      <p>Change the same line to:</p>
+      <pre><code>This file belongs to experimental science.</code></pre>
+
+      <p>Now both partners run (each on their own machine):</p>
+      <pre><code>git add notes.txt
+git commit -m "Update notes"</code></pre>
+
+      <div class="note">
+        <b>Checkpoint question:</b> How many different versions of history exist right now?
+      </div>
+
+      <p class="muted"><b>Switch roles now:</b> whoever was Driver becomes Observer and vice versa.</p>
+    </section>
+
+    <section class="card">
+      <h2>Part 3: The collision (guaranteed failure)</h2>
+      <ol>
+        <li><b>New Driver</b> pushes first:</li>
+      </ol>
+      <pre><code>git push</code></pre>
+
+      <ol start="2">
+        <li><b>New Observer</b> tries to push:</li>
+      </ol>
+      <pre><code>git push</code></pre>
+
+      <div class="note warn">
+        <b>Expected result:</b> push is rejected because the remote has commits you do not have locally.
+        Git is protecting history from being overwritten.
+      </div>
+
+      <div class="note">
+        <b>Instructor prompt:</b> Is this an error, or Git being cautious on your behalf?
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Part 4: Fetch, merge, conflict</h2>
+      <p><b>On the machine that failed to push</b>, run:</p>
+      <pre><code>git fetch
+git status
+git merge origin/main</code></pre>
+
+      <p>You should now see a merge conflict. Open <code>notes.txt</code> and find the conflict markers:</p>
+      <pre><code>&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD
+This file belongs to experimental science.
+=======
+This file belongs to computational science.
+&gt;&gt;&gt;&gt;&gt;&gt;&gt; origin/main</code></pre>
+
+      <div class="note">
+        <b>Checkpoint questions:</b>
+        <ul>
+          <li>Which version is <code>HEAD</code>?</li>
+          <li>Which version came from <code>origin/main</code>?</li>
+          <li>Why can’t Git decide automatically?</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Part 5: Resolve and synchronize (the click)</h2>
+      <p>Edit <code>notes.txt</code> to a single line that resolves the disagreement, for example:</p>
+      <pre><code>This file belongs to both experimental and computational science.</code></pre>
+
+      <p>Then finish the merge and push:</p>
+      <pre><code>git add notes.txt
+git commit -m "Resolve merge conflict"
+git push</code></pre>
+
+      <p>On the other machine, pull the resolution:</p>
+      <pre><code>git pull</code></pre>
+
+      <div class="note ok">
+        <b>Success condition:</b> both machines show the same line in <code>notes.txt</code>, and <code>git status</code> says “nothing to commit”.
+      </div>
+    </section>
+
+    <section class="card qa">
+      <h2>Part 6: Reflection (2 minutes)</h2>
+      <p>Answer briefly (complete sentences). If you print this page, write on paper.</p>
+
+      <h3>1) What state were you in when Git stopped you from pushing?</h3>
+      <textarea placeholder="Answer..."></textarea>
+
+      <h3>2) Why is git status the most important command?</h3>
+      <textarea placeholder="Answer..."></textarea>
+
+      <h3>3) What would happen if Git allowed you to push anyway?</h3>
+      <textarea placeholder="Answer..."></textarea>
+
+      <p class="mini">Tip: You can also save these answers elsewhere. This page does not store them.</p>
+    </section>
+
+    <section class="card">
+      <h2>Troubleshooting (minimal, but useful)</h2>
+      <ul>
+        <li>If <code>git merge origin/main</code> says it can’t find <code>origin/main</code>, run <code>git branch -a</code> and check the remote branch name (sometimes it’s <code>origin/master</code>).</li>
+        <li>If authentication fails, GitHub may require a token instead of a password. Use the browser prompt Git opens, or follow your course’s token instructions.</li>
+        <li>If you truly get stuck: run <code>git status</code>, read it out loud, and do what it tells you.</li>
+      </ul>
+      <div class="note">
+        The lab is successful when you see a conflict once and survive it. That’s the whole spell.
+      </div>
+    </section>
+  </main>
+
+  <footer>
+     <p class="muted" style="margin-top:12px;">
+      Print-friendly: use your browser’s Print dialog. In print view, checkboxes and text boxes are hidden.
+    </p>
+  </footer>
+</body>
+</html>
