@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Narrative B – 3D Basement Fungi Detection &amp; Remediation</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #1a1820; overflow: hidden; font-family: 'Segoe UI', Tahoma, sans-serif; }
+  #info {
+    position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+    color: #ccddaa; font-size: 13px; text-align: center; z-index: 10;
+    background: rgba(14,12,8,0.9); padding: 8px 22px; border-radius: 20px;
+    border: 1px solid rgba(120,100,60,0.3); pointer-events: none;
+  }
+  #info h1 { font-size: 15px; color: #ddeebb; margin-bottom: 2px; }
+  #info p { font-size: 10px; color: #99aa77; }
+  .label-3d { position: absolute; pointer-events: none; font-family: 'Segoe UI', sans-serif; }
+  .step-text {
+    padding: 5px 12px; border-radius: 6px;
+    font-size: 10px; color: #dde; white-space: nowrap;
+    background: rgba(10,10,14,0.9);
+    border: 1px solid rgba(100,120,80,0.3);
+    text-align: center; font-weight: 600;
+    opacity: 0; transition: opacity 0.25s ease;
+  }
+  .arm-label {
+    padding: 2px 6px; border-radius: 3px;
+    font-size: 8px; color: #dde; white-space: nowrap;
+    background: rgba(10,10,14,0.85);
+    border: 1px solid rgba(100,140,180,0.3);
+    text-align: center;
+    opacity: 0; transition: opacity 0.25s ease;
+  }
+</style>
+</head>
+<body>
+<div id="info">
+  <h1>Narrative B: Basement Fungi Detection &amp; Remediation</h1>
+  <p>Drag to orbit &bull; Scroll to zoom &bull; Hover over objects to see labels</p>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.163.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.163.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+// ==================== SCENE ====================
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1a1820);
+
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 200);
+camera.position.set(14, 10, 14);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.6;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+
+const labelRenderer = new CSS2DRenderer();
+labelRenderer.setSize(window.innerWidth, window.innerHeight);
+labelRenderer.domElement.style.position = 'absolute';
+labelRenderer.domElement.style.top = '0';
+labelRenderer.domElement.style.pointerEvents = 'none';
+document.body.appendChild(labelRenderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+controls.target.set(0, 2, 0);
+controls.maxPolarAngle = Math.PI / 2.05;
+controls.minDistance = 6;
+controls.maxDistance = 35;
+
+// ==================== ENVIRONMENT ====================
+const pmremGen = new THREE.PMREMGenerator(renderer);
+const envScene = new THREE.Scene();
+const envMat = new THREE.ShaderMaterial({
+  side: THREE.BackSide,
+  uniforms: { topColor: { value: new THREE.Color(0x3a3a4a) }, bottomColor: { value: new THREE.Color(0x1a1818) } },
+  vertexShader: `varying float vY; void main(){ vY = normalize(position).y; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+  fragmentShader: `uniform vec3 topColor; uniform vec3 bottomColor; varying float vY;
+    void main(){ gl_FragColor = vec4(mix(bottomColor, topColor, vY*0.5+0.5), 1.0); }`
+});
+envScene.add(new THREE.Mesh(new THREE.SphereGeometry(50, 32, 16), envMat));
+scene.environment = pmremGen.fromScene(envScene).texture;
+
+// ==================== LIGHTING ====================
+scene.add(new THREE.AmbientLight(0x8888aa, 1.2));
+
+const bulbLight = new THREE.PointLight(0xffeecc, 8, 30, 1.2);
+bulbLight.position.set(0, 5.2, 0);
+bulbLight.castShadow = true;
+bulbLight.shadow.mapSize.set(1024, 1024);
+scene.add(bulbLight);
+
+const bulbLight2 = new THREE.PointLight(0xffeecc, 5, 25, 1.3);
+bulbLight2.position.set(-3, 5.2, -2);
+scene.add(bulbLight2);
+const bulbMesh2 = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 8), new THREE.MeshStandardMaterial({
+  color: 0xffffcc, emissive: 0xffeeaa, emissiveIntensity: 2
+}));
+bulbMesh2.position.copy(bulbLight2.position);
+scene.add(bulbMesh2);
+
+const bulbLight3 = new THREE.PointLight(0xffeecc, 5, 25, 1.3);
+bulbLight3.position.set(3, 5.2, -2);
+scene.add(bulbLight3);
+const bulbMesh3 = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 8), new THREE.MeshStandardMaterial({
+  color: 0xffffcc, emissive: 0xffeeaa, emissiveIntensity: 2
+}));
+bulbMesh3.position.copy(bulbLight3.position);
+scene.add(bulbMesh3);
+
+const bulbMesh = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), new THREE.MeshStandardMaterial({
+  color: 0xffffcc, emissive: 0xffeeaa, emissiveIntensity: 2
+}));
+bulbMesh.position.copy(bulbLight.position);
+scene.add(bulbMesh);
+const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 0.5, 4),
+  new THREE.MeshStandardMaterial({ color: 0x333333 }));
+cord.position.set(0, 5.5, 0);
+scene.add(cord);
+
+const windowLight = new THREE.RectAreaLight(0xaabbcc, 4, 1.5, 0.8);
+windowLight.position.set(0, 4.5, -6);
+windowLight.lookAt(0, 3, 0);
+scene.add(windowLight);
+
+const dirLight = new THREE.DirectionalLight(0xffeedd, 1.2);
+dirLight.position.set(5, 10, 5);
+dirLight.castShadow = true;
+dirLight.shadow.mapSize.set(2048, 2048);
+dirLight.shadow.camera.left = -12; dirLight.shadow.camera.right = 12;
+dirLight.shadow.camera.top = 12; dirLight.shadow.camera.bottom = -12;
+scene.add(dirLight);
+
+scene.add(new THREE.DirectionalLight(0xccddff, 0.6).translateX(-5).translateY(8).translateZ(-3));
+scene.add(new THREE.PointLight(0xeeddcc, 2, 20, 1.5).translateY(1.5).translateZ(2));
+
+// ==================== PROCEDURAL TEXTURES ====================
+function makeTexture(size, fn) {
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  fn(c.getContext('2d'), size);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  return t;
+}
+
+const concreteTex = makeTexture(512, (ctx, s) => {
+  ctx.fillStyle = '#6a6a6e';
+  ctx.fillRect(0, 0, s, s);
+  for (let i = 0; i < 4000; i++) {
+    const v = 90 + Math.random() * 30;
+    ctx.fillStyle = `rgb(${v},${v},${v+3})`;
+    ctx.fillRect(Math.random()*s, Math.random()*s, 1+Math.random()*3, 1+Math.random()*3);
+  }
+  ctx.strokeStyle = '#555558'; ctx.lineWidth = 0.5;
+  for (let i = 0; i < 5; i++) {
+    ctx.beginPath();
+    let x = Math.random()*s, y = Math.random()*s;
+    ctx.moveTo(x, y);
+    for (let j = 0; j < 8; j++) { x += (Math.random()-0.5)*60; y += (Math.random()-0.5)*60; ctx.lineTo(x, y); }
+    ctx.stroke();
+  }
+});
+
+const cinderTex = makeTexture(512, (ctx, s) => {
+  ctx.fillStyle = '#7a7a80';
+  ctx.fillRect(0, 0, s, s);
+  const bw = s/2, bh = s/4;
+  ctx.strokeStyle = '#5a5a60'; ctx.lineWidth = 3;
+  for (let row = 0; row < 4; row++) {
+    const offset = (row % 2) * bw/2;
+    for (let col = -1; col < 3; col++) {
+      ctx.strokeRect(col*bw + offset, row*bh, bw, bh);
+    }
+  }
+  for (let i = 0; i < 2000; i++) {
+    const v = 105 + Math.random() * 30;
+    ctx.fillStyle = `rgb(${v},${v},${v+2})`;
+    ctx.fillRect(Math.random()*s, Math.random()*s, 1+Math.random()*2, 1+Math.random()*2);
+  }
+});
+cinderTex.repeat.set(2, 1.5);
+
+const woodTex = makeTexture(256, (ctx, s) => {
+  ctx.fillStyle = '#8a7055';
+  ctx.fillRect(0, 0, s, s);
+  for (let y = 0; y < s; y++) {
+    const v = 120 + Math.sin(y*0.3)*15 + Math.random()*10;
+    ctx.fillStyle = `rgb(${v},${v*0.8|0},${v*0.6|0})`;
+    ctx.fillRect(0, y, s, 1);
+  }
+});
+
+// ==================== MATERIALS ====================
+const matConcreteFloor = new THREE.MeshStandardMaterial({ map: concreteTex, roughness: 0.85 });
+const matCinderWall = new THREE.MeshStandardMaterial({ map: cinderTex, roughness: 0.8 });
+const matCeiling = new THREE.MeshStandardMaterial({ color: 0x8a7a60, roughness: 0.9, map: woodTex });
+const matMetal = new THREE.MeshStandardMaterial({ color: 0x999999, roughness: 0.4, metalness: 0.6 });
+const matWhiteAppliance = new THREE.MeshStandardMaterial({ color: 0xe8e8e8, roughness: 0.3, metalness: 0.1 });
+const matShelf = new THREE.MeshStandardMaterial({ color: 0x7a6a50, roughness: 0.7, map: woodTex });
+const matPipe = new THREE.MeshStandardMaterial({ color: 0x777780, roughness: 0.35, metalness: 0.7 });
+const matRobotBody = new THREE.MeshStandardMaterial({ color: 0x2a3a5a, roughness: 0.15, metalness: 0.75 });
+const matDock = new THREE.MeshStandardMaterial({ color: 0x1a1a22, roughness: 0.3, metalness: 0.6 });
+const matArmMetal = new THREE.MeshStandardMaterial({ color: 0x5a6a8a, metalness: 0.6, roughness: 0.25 });
+const matSensorTip = new THREE.MeshStandardMaterial({ color: 0x0099ff, emissive: 0x0066aa, emissiveIntensity: 0.8, roughness: 0.1 });
+const matNozzleTip = new THREE.MeshStandardMaterial({ color: 0x2dc653, emissive: 0x1a8a33, emissiveIntensity: 0.6, metalness: 0.5, roughness: 0.2 });
+
+function box(w, h, d, mat) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+  m.castShadow = true; m.receiveShadow = true;
+  return m;
+}
+
+// ==================== LABEL HELPER (no numbers, hidden by default) ====================
+function addLabel(text, color, lx, ly, lz, tx, ty, tz) {
+  const div = document.createElement('div');
+  div.className = 'label-3d';
+  const inner = document.createElement('div');
+  inner.className = 'step-text';
+  inner.style.borderLeft = `3px solid ${color}`;
+  inner.innerHTML = text;
+  div.appendChild(inner);
+  const label = new CSS2DObject(div);
+  label.position.set(lx, ly, lz);
+  scene.add(label);
+  let line = null, dot = null;
+  if (tx !== undefined) {
+    const pts = [new THREE.Vector3(lx,ly,lz), new THREE.Vector3(tx,ty,tz)];
+    const lg = new THREE.BufferGeometry().setFromPoints(pts);
+    const lm = new THREE.LineDashedMaterial({ color, dashSize: 0.15, gapSize: 0.08, transparent: true, opacity: 0.55 });
+    line = new THREE.Line(lg, lm);
+    line.computeLineDistances();
+    line.visible = false;
+    scene.add(line);
+    dot = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 8),
+      new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.5 }));
+    dot.position.set(tx, ty, tz);
+    dot.visible = false;
+    scene.add(dot);
+  }
+  return { inner, line, dot };
+}
+
+function addArmLabel(text, x, y, z) {
+  const div = document.createElement('div');
+  div.className = 'label-3d';
+  const inner = document.createElement('div');
+  inner.className = 'arm-label';
+  inner.textContent = text;
+  div.appendChild(inner);
+  const label = new CSS2DObject(div);
+  label.position.set(x, y, z);
+  return { labelObj: label, inner };
+}
+
+// ==================== BASEMENT STRUCTURE ====================
+const W = 12, D = 10, H = 5.5;
+
+const fl = box(W, 0.3, D, matConcreteFloor);
+fl.position.set(0, -0.15, 0); scene.add(fl);
+
+const ceilSlab = box(W, 0.2, D, matCeiling);
+ceilSlab.position.set(0, H, 0); scene.add(ceilSlab);
+
+for (let x = -5; x <= 5; x += 1.5) {
+  const joist = box(0.1, 0.5, D, new THREE.MeshStandardMaterial({ map: woodTex, color: 0x6a5a40, roughness: 0.8 }));
+  joist.position.set(x, H - 0.25, 0);
+  scene.add(joist);
+}
+
+const matWallBack = matCinderWall.clone();
+const backWall = box(W, H, 0.3, matWallBack);
+backWall.position.set(0, H/2, -D/2); scene.add(backWall);
+
+const leftWall = box(0.3, H, D, matCinderWall);
+leftWall.position.set(-W/2, H/2, 0); scene.add(leftWall);
+
+const rightWall = box(0.3, H, D, matCinderWall);
+rightWall.position.set(W/2, H/2, 0); scene.add(rightWall);
+
+const frontWallLeft = box(5, H, 0.3, matCinderWall);
+frontWallLeft.position.set(-3.5, H/2, D/2);
+frontWallLeft.material = matCinderWall.clone();
+frontWallLeft.material.transparent = true;
+frontWallLeft.material.opacity = 0.25;
+scene.add(frontWallLeft);
+
+const frontWallRight = box(5, H, 0.3, matCinderWall);
+frontWallRight.position.set(3.5, H/2, D/2);
+frontWallRight.material = matCinderWall.clone();
+frontWallRight.material.transparent = true;
+frontWallRight.material.opacity = 0.25;
+scene.add(frontWallRight);
+
+// Small window
+const winFrame = box(1.6, 0.9, 0.35, matMetal);
+winFrame.position.set(0, 4.5, -D/2 + 0.1); scene.add(winFrame);
+const winGlass = box(1.3, 0.6, 0.05, new THREE.MeshStandardMaterial({
+  color: 0x8899aa, transparent: true, opacity: 0.35, roughness: 0.05, metalness: 0.1
+}));
+winGlass.position.set(0, 4.5, -D/2 + 0.15); scene.add(winGlass);
+
+// ==================== BASEMENT CONTENTS ====================
+// Water heater
+const whBody = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 2.2, 16), matWhiteAppliance);
+whBody.position.set(-4.5, 1.1, -3); whBody.castShadow = true; scene.add(whBody);
+const whTop = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.6, 0.1, 16), matMetal);
+whTop.position.set(-4.5, 2.2, -3); scene.add(whTop);
+scene.add(new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.5, 8), matPipe).translateX(-4.3).translateY(3).translateZ(-3));
+scene.add(new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.5, 8), matPipe).translateX(-4.7).translateY(3).translateZ(-3));
+
+// Washer
+const washer = box(1.2, 1.6, 1.1, matWhiteAppliance);
+washer.position.set(-4, 0.8, -0.5); scene.add(washer);
+scene.add(new THREE.Mesh(new THREE.CircleGeometry(0.35, 16),
+  new THREE.MeshStandardMaterial({ color: 0x444444, roughness: 0.1, metalness: 0.7 })).translateX(-4).translateY(0.9).translateZ(0.06));
+scene.add(new THREE.Mesh(new THREE.CircleGeometry(0.28, 16),
+  new THREE.MeshStandardMaterial({ color: 0x2a3a4a, roughness: 0.05, transparent: true, opacity: 0.5 })).translateX(-4).translateY(0.9).translateZ(0.07));
+
+// Dryer
+const dryer = box(1.2, 1.6, 1.1, matWhiteAppliance);
+dryer.position.set(-4, 0.8, 0.8); scene.add(dryer);
+scene.add(box(0.8, 0.8, 0.05, new THREE.MeshStandardMaterial({ color: 0xdddddd, roughness: 0.3, metalness: 0.1 })).translateX(-4).translateY(0.9).translateZ(1.36));
+
+// Shelving unit
+for (let h of [0.4, 1.4, 2.4, 3.4]) {
+  scene.add(box(3, 0.08, 0.8, matShelf).translateX(4.2).translateY(h).translateZ(-3.6));
+}
+for (let x of [2.8, 4.2, 5.6]) {
+  scene.add(box(0.06, 3.5, 0.06, matMetal).translateX(x).translateY(1.75).translateZ(-3.6));
+}
+const itemColors = [0xc0b0a0, 0xb0c0d0, 0xd0c8b8, 0xa0b0a0, 0xc8b8a8];
+for (let h of [0.5, 1.5, 2.5]) {
+  for (let i = 0; i < 4; i++) {
+    const w = 0.3 + Math.random() * 0.4;
+    const ih = 0.2 + Math.random() * 0.3;
+    scene.add(box(w, ih, 0.4 + Math.random() * 0.2,
+      new THREE.MeshStandardMaterial({ color: itemColors[i % 5], roughness: 0.6 }))
+      .translateX(3.2 + i * 0.7).translateY(h + ih/2).translateZ(-3.6));
+  }
+}
+
+// Ceiling pipes
+for (let z of [-2, 1, 3]) {
+  const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, W, 8), matPipe);
+  pipe.rotation.z = Math.PI / 2;
+  pipe.position.set(0, H - 0.6, z);
+  scene.add(pipe);
+}
+
+// Staircase
+const stairMat = new THREE.MeshStandardMaterial({ map: woodTex, color: 0x7a6a50, roughness: 0.7 });
+for (let i = 0; i < 8; i++) {
+  scene.add(box(1.8, 0.15, 0.6, stairMat).translateX(-4.5).translateY(0.3 + i * 0.65).translateZ(3 + i * 0.35));
+}
+
+// ==================== MOLD COLONY (much more prominent) ====================
+const moldGroup = new THREE.Group();
+moldGroup.position.set(5, 1.5, -4.5);
+
+// Larger, brighter mold material
+const moldMat = new THREE.MeshStandardMaterial({
+  color: 0x1a6a0e, roughness: 0.85,
+  emissive: 0x2a5a1a, emissiveIntensity: 0.4
+});
+const moldMatDark = new THREE.MeshStandardMaterial({
+  color: 0x0a4a08, roughness: 0.9,
+  emissive: 0x1a3a0e, emissiveIntensity: 0.3
+});
+
+// Main colony — bigger spheres, more spread
+const moldPositions = [
+  [0,0,0,0.7], [0.5,0.4,0.05,0.5], [-0.4,-0.3,0.08,0.55],
+  [0.8,-0.2,-0.03,0.4], [-0.7,0.5,0.02,0.45], [0.3,-0.6,0.05,0.35],
+  [-0.3,0.8,0.03,0.3], [0.9,0.6,0.04,0.38], [-0.8,-0.5,0.06,0.42],
+  [1.1,0.1,0.02,0.3], [-0.2,-0.8,0.05,0.25], [0.6,0.9,0.03,0.2]
+];
+moldPositions.forEach(([x,y,z,r]) => {
+  const m = new THREE.Mesh(new THREE.SphereGeometry(r, 14, 14),
+    Math.random() > 0.5 ? moldMat : moldMatDark);
+  m.position.set(x, y, z);
+  m.scale.z = 0.35;
+  moldGroup.add(m);
+});
+
+// Darker splotch underneath (wall stain/spread)
+const splotchMat = new THREE.MeshStandardMaterial({
+  color: 0x2a2a20, transparent: true, opacity: 0.5, roughness: 0.95
+});
+const splotch = new THREE.Mesh(new THREE.CircleGeometry(1.8, 24), splotchMat);
+splotch.position.set(0, 0, -0.02);
+moldGroup.add(splotch);
+
+// Conidiophore stalks (much more prominent)
+const stalkMat = new THREE.MeshStandardMaterial({
+  color: 0x4a8b38, roughness: 0.7, emissive: 0x3a6a2a, emissiveIntensity: 0.35
+});
+for (let i = 0; i < 20; i++) {
+  const x = (Math.random() - 0.5) * 1.8;
+  const y = (Math.random() - 0.5) * 1.5;
+  const stalkH = 0.5 + Math.random() * 0.5;
+  const stalk = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.02, stalkH, 4), stalkMat);
+  stalk.position.set(x, y, 0.2 + Math.random() * 0.15);
+  stalk.rotation.x = -Math.PI/6 + Math.random() * 0.4;
+  moldGroup.add(stalk);
+  // Larger spore head
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.06 + Math.random() * 0.04, 8, 8), stalkMat);
+  head.position.set(x, y + stalkH * 0.5, 0.35 + Math.random() * 0.15);
+  moldGroup.add(head);
+}
+
+// Floating spores (more visible)
+const sporeMat = new THREE.MeshStandardMaterial({
+  color: 0x6aab58, transparent: true, opacity: 0.5,
+  emissive: 0x4a7a38, emissiveIntensity: 0.4
+});
+const spores = [];
+for (let i = 0; i < 30; i++) {
+  const sp = new THREE.Mesh(new THREE.SphereGeometry(0.02 + Math.random() * 0.015, 6, 6), sporeMat);
+  sp.position.set(
+    (Math.random() - 0.5) * 3,
+    (Math.random() - 0.5) * 2.5,
+    0.4 + Math.random() * 2.5
+  );
+  sp.userData.basePos = sp.position.clone();
+  sp.userData.speed = 0.2 + Math.random() * 0.4;
+  sp.userData.phase = Math.random() * Math.PI * 2;
+  moldGroup.add(sp);
+  spores.push(sp);
+}
+
+scene.add(moldGroup);
+
+// Brighter mold alert light
+const moldGlow = new THREE.PointLight(0x66cc22, 1.5, 6);
+moldGlow.position.set(5, 1.5, -3.5);
+scene.add(moldGlow);
+
+// Alert indicator (pulsing red)
+const alertLight = new THREE.PointLight(0xff4422, 1.0, 4);
+alertLight.position.set(5.5, 2.5, -4);
+scene.add(alertLight);
+
+// Large moisture stain
+const stainMat = new THREE.MeshStandardMaterial({
+  color: 0x555560, transparent: true, opacity: 0.35, roughness: 0.9
+});
+const stain = new THREE.Mesh(new THREE.CircleGeometry(1.5, 24), stainMat);
+stain.position.set(5, 1.8, -4.83); scene.add(stain);
+
+// ==================== LARGER ROBOT WITH LABELED ARMS ====================
+function createBigBot(eyeColor, emissiveColor, showArms) {
+  const g = new THREE.Group();
+
+  // Disc body (larger)
+  const bodyGeo = new THREE.CylinderGeometry(0.75, 0.75, 0.22, 24);
+  const bodyMesh = new THREE.Mesh(bodyGeo, matRobotBody);
+  bodyMesh.castShadow = true;
+  g.add(bodyMesh);
+
+  // Top dome (taller, more personality)
+  const domeGeo = new THREE.SphereGeometry(0.35, 16, 10, 0, Math.PI*2, 0, Math.PI/2);
+  const dome = new THREE.Mesh(domeGeo, matRobotBody);
+  dome.position.y = 0.11;
+  g.add(dome);
+
+  // Wider "face plate" on front
+  const facePlate = box(0.5, 0.15, 0.05, new THREE.MeshStandardMaterial({
+    color: 0x3a4a6a, metalness: 0.5, roughness: 0.2
+  }));
+  facePlate.position.set(0, 0.28, 0.25);
+  g.add(facePlate);
+
+  // Eyes (larger, more expressive)
+  const eyeMat = new THREE.MeshStandardMaterial({
+    color: eyeColor, emissive: emissiveColor, emissiveIntensity: 1.0, roughness: 0.1
+  });
+  const eyeGeo = new THREE.SphereGeometry(0.08, 10, 10);
+  const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
+  leftEye.position.set(-0.13, 0.3, 0.22);
+  g.add(leftEye);
+  const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
+  rightEye.position.set(0.13, 0.3, 0.22);
+  g.add(rightEye);
+
+  // "Eyebrow" ridge (personality detail)
+  const browMat = new THREE.MeshStandardMaterial({ color: 0x1a2a3a, metalness: 0.5, roughness: 0.3 });
+  const leftBrow = box(0.12, 0.025, 0.03, browMat);
+  leftBrow.position.set(-0.13, 0.38, 0.24);
+  leftBrow.rotation.z = 0.15;
+  g.add(leftBrow);
+  const rightBrow = box(0.12, 0.025, 0.03, browMat);
+  rightBrow.position.set(0.13, 0.38, 0.24);
+  rightBrow.rotation.z = -0.15;
+  g.add(rightBrow);
+
+  // Front sensor bar (wider)
+  const sensorBar = box(0.5, 0.03, 0.03, new THREE.MeshStandardMaterial({
+    color: eyeColor, emissive: emissiveColor, emissiveIntensity: 0.5
+  }));
+  sensorBar.position.set(0, 0.12, 0.73);
+  g.add(sensorBar);
+
+  // LED ring
+  const ringGeo = new THREE.TorusGeometry(0.72, 0.015, 8, 32);
+  const ring = new THREE.Mesh(ringGeo, new THREE.MeshStandardMaterial({
+    color: eyeColor, emissive: emissiveColor, emissiveIntensity: 0.6, transparent: true, opacity: 0.8
+  }));
+  ring.rotation.x = Math.PI / 2;
+  ring.position.y = 0.05;
+  g.add(ring);
+
+  // Eye glow
+  const el = new THREE.PointLight(eyeColor, 0.5, 3);
+  el.position.set(0, 0.35, 0.3);
+  g.add(el);
+
+  // Antenna
+  const antennaGeo = new THREE.CylinderGeometry(0.015, 0.015, 0.4, 6);
+  const antenna = new THREE.Mesh(antennaGeo, matArmMetal);
+  antenna.position.set(0, 0.55, 0);
+  g.add(antenna);
+  const antennaTip = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 8), eyeMat);
+  antennaTip.position.set(0, 0.77, 0);
+  g.add(antennaTip);
+
+  if (showArms) {
+    // ---- SENSING ARM (right side) ----
+    const sensingArm = new THREE.Group();
+    // Shoulder joint
+    const shoulder1 = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 8), matArmMetal);
+    shoulder1.position.set(0, 0.15, 0);
+    sensingArm.add(shoulder1);
+    // Upper arm
+    const upper1 = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.035, 0.7, 8), matArmMetal);
+    upper1.position.set(0.15, 0.55, 0);
+    upper1.rotation.z = -0.25;
+    sensingArm.add(upper1);
+    // Elbow
+    const elbow1 = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 8), matArmMetal);
+    elbow1.position.set(0.32, 0.9, 0);
+    sensingArm.add(elbow1);
+    // Forearm
+    const forearm1 = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.03, 0.6, 8), matArmMetal);
+    forearm1.position.set(0.55, 1.15, 0);
+    forearm1.rotation.z = -0.8;
+    sensingArm.add(forearm1);
+    // Sensor tip (blue glowing probe)
+    const sensorProbe = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.15, 8), matSensorTip);
+    sensorProbe.position.set(0.78, 1.3, 0);
+    sensorProbe.rotation.z = -1.2;
+    sensingArm.add(sensorProbe);
+    const sensorGlow = new THREE.PointLight(0x0099ff, 0.5, 2);
+    sensorGlow.position.set(0.82, 1.35, 0);
+    sensingArm.add(sensorGlow);
+
+    sensingArm.position.set(0.6, 0, 0);
+    g.add(sensingArm);
+    g.userData.sensingArm = sensingArm;
+
+    // Sensing arm label
+    const sensLabelData = addArmLabel('Sensing Arm', 0.6 + 0.78, 1.6, 0);
+    g.add(sensLabelData.labelObj);
+    if (!g.userData.armLabelInners) g.userData.armLabelInners = [];
+    g.userData.armLabelInners.push(sensLabelData.inner);
+
+    // ---- INTERVENTION ARM (left side) ----
+    const interventionArm = new THREE.Group();
+    // Shoulder joint
+    const shoulder2 = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 8), matArmMetal);
+    shoulder2.position.set(0, 0.15, 0);
+    interventionArm.add(shoulder2);
+    // Upper arm
+    const upper2 = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.035, 0.7, 8), matArmMetal);
+    upper2.position.set(-0.15, 0.55, 0);
+    upper2.rotation.z = 0.25;
+    interventionArm.add(upper2);
+    // Elbow
+    const elbow2 = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 8), matArmMetal);
+    elbow2.position.set(-0.32, 0.9, 0);
+    interventionArm.add(elbow2);
+    // Forearm
+    const forearm2 = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.03, 0.6, 8), matArmMetal);
+    forearm2.position.set(-0.55, 1.15, 0);
+    forearm2.rotation.z = 0.8;
+    interventionArm.add(forearm2);
+    // Nozzle tip (green spray nozzle)
+    const nozzle = box(0.1, 0.1, 0.1, matNozzleTip);
+    nozzle.position.set(-0.78, 1.3, 0);
+    interventionArm.add(nozzle);
+    const nozzleGlow = new THREE.PointLight(0x33ff66, 0.5, 2);
+    nozzleGlow.position.set(-0.82, 1.35, 0);
+    interventionArm.add(nozzleGlow);
+
+    interventionArm.position.set(-0.6, 0, 0);
+    g.add(interventionArm);
+    g.userData.interventionArm = interventionArm;
+
+    // Intervention arm label
+    const intLabelData = addArmLabel('Intervention Arm', -0.6 - 0.78, 1.6, 0);
+    g.add(intLabelData.labelObj);
+    if (!g.userData.armLabelInners) g.userData.armLabelInners = [];
+    g.userData.armLabelInners.push(intLabelData.inner);
+  }
+
+  return g;
+}
+
+// ==================== ROBOT INSTANCES (animated) ====================
+// Charging dock (scenery)
+const dock = box(1.0, 0.18, 0.6, matDock);
+dock.position.set(-2, 0.09, 3.8); scene.add(dock);
+const dockBackplate = box(0.8, 0.5, 0.1, matDock);
+dockBackplate.position.set(-2, 0.3, 4.05); scene.add(dockBackplate);
+const dockLED = new THREE.Mesh(new THREE.SphereGeometry(0.04, 6, 6),
+  new THREE.MeshStandardMaterial({ color: 0x44ff44, emissive: 0x22dd22, emissiveIntensity: 1 }));
+dockLED.position.set(-2, 0.48, 4.07); scene.add(dockLED);
+
+// Bot 1: VOC patrol (animated — moves around room)
+const botPatrol = createBigBot(0xff9922, 0xcc7718, true);
+botPatrol.position.set(0, 0.11, 0);
+scene.add(botPatrol);
+
+// Bot 2: Spraying bot (animated — works near mold)
+const botSpray = createBigBot(0x33dd66, 0x22aa44, true);
+botSpray.position.set(3, 0.11, -4);
+scene.add(botSpray);
+
+// Robot patrol paths (animated)
+const botPaths = [
+  // Patrol bot roams the room
+  { bot: botPatrol, cx: -0.5, cz: 0, rx: 2.5, rz: 2, speed: 0.08, t: 0.25 },
+  // Spray bot works near mold (tighter orbit)
+  { bot: botSpray, cx: 4, cz: -3.5, rx: 1, rz: 0.8, speed: 0.05, t: 0.75 },
+];
+
+// VOC particles
+const vocMat = new THREE.MeshStandardMaterial({
+  color: 0xaa8833, transparent: true, opacity: 0.3, emissive: 0x886622, emissiveIntensity: 0.3
+});
+const vocParticles = [];
+for (let i = 0; i < 15; i++) {
+  const v = new THREE.Mesh(new THREE.SphereGeometry(0.03 + Math.random()*0.02, 6, 6), vocMat);
+  v.position.set(2 + Math.random() * 3, 1 + Math.random() * 2, -2 - Math.random() * 2);
+  v.userData.basePos = v.position.clone();
+  v.userData.speed = 0.1 + Math.random() * 0.3;
+  v.userData.phase = Math.random() * Math.PI * 2;
+  scene.add(v);
+  vocParticles.push(v);
+}
+
+// Spray particles (from bot 4 nozzle)
+const sprayParticles = [];
+const sprayMat = new THREE.MeshStandardMaterial({
+  color: 0x33ff66, emissive: 0x22cc44, emissiveIntensity: 0.8,
+  transparent: true, opacity: 0.6
+});
+for (let i = 0; i < 30; i++) {
+  const sp = new THREE.Mesh(new THREE.SphereGeometry(0.03 + Math.random()*0.02, 6, 6), sprayMat);
+  sp.position.set(4 + Math.random() * 1.2, 1.2 + Math.random() * 0.8, -4.2 - Math.random() * 0.4);
+  sp.userData.basePos = sp.position.clone();
+  sp.userData.phase = Math.random() * Math.PI * 2;
+  scene.add(sp);
+  sprayParticles.push(sp);
+}
+
+// Probiotic coating (post-treatment zone)
+const coatingMat = new THREE.MeshStandardMaterial({
+  color: 0x2a8a2a, transparent: true, opacity: 0.2,
+  emissive: 0x1a5a1a, emissiveIntensity: 0.3, side: THREE.DoubleSide
+});
+const coating = new THREE.Mesh(new THREE.CircleGeometry(0.9, 24), coatingMat);
+coating.position.set(5, 1.5, -4.82); scene.add(coating);
+
+// ==================== AI HUB ====================
+const hubGroup = new THREE.Group();
+hubGroup.add(box(1.2, 0.8, 0.08, new THREE.MeshStandardMaterial({
+  color: 0x0a2a4a, metalness: 0.7, roughness: 0.15, emissive: 0x003355, emissiveIntensity: 0.4
+})));
+const hubFace = box(1.0, 0.6, 0.02, new THREE.MeshStandardMaterial({
+  color: 0x001828, emissive: 0x004488, emissiveIntensity: 0.6
+}));
+hubFace.position.z = 0.05; hubGroup.add(hubFace);
+const hubGlow = new THREE.PointLight(0x00ddff, 0.6, 3);
+hubGlow.position.set(0, 0, 0.5); hubGroup.add(hubGlow);
+hubGroup.position.set(-5.8, 3, 2);
+hubGroup.rotation.y = Math.PI / 2;
+scene.add(hubGroup);
+
+// Phone
+const phoneGroup = new THREE.Group();
+phoneGroup.add(box(0.35, 0.6, 0.03, new THREE.MeshStandardMaterial({
+  color: 0x1a1a22, roughness: 0.2, metalness: 0.5
+})));
+const phoneScreen = box(0.3, 0.5, 0.01, new THREE.MeshStandardMaterial({
+  color: 0x0a2a1a, emissive: 0x004422, emissiveIntensity: 0.8
+}));
+phoneScreen.position.z = 0.02; phoneGroup.add(phoneScreen);
+phoneGroup.position.set(-5.8, 3.8, 2.5);
+phoneGroup.rotation.y = Math.PI / 2;
+scene.add(phoneGroup);
+
+// ==================== LABELS (inside the room, hover-only) ====================
+const lblVOC = addLabel('VOC sensors detect<br>fungal metabolites on patrol',
+  '#dd8822',     0.5, 3,     1.5,   0,    0.5,  0);
+
+const lblMold = addLabel('Aspergillus niger colony<br>confirmed by camera + spore counter',
+  '#dd3333',     3.5, 3.5,  -1.5,   4.5,  1.5, -4.5);
+
+const lblSpray = addLabel('Robotic arm deploys<br>antifungal probiotic spray',
+  '#22aa44',     1.5, 2.5,  -3,     4.2,  1.6, -4.2);
+
+const lblCoating = addLabel('Probiotic coating persists<br>colony reduced 95% in 14 days',
+  '#228844',     3,   0.8,  -2,     5,    1.5, -4.7);
+
+const lblHub = addLabel('AI Hub notifies homeowner<br>schedules ongoing protection',
+  '#0066aa',    -4,   4,     1,    -5.6,  3,    2);
+
+// ==================== HOVER SYSTEM ====================
+const hoverMap = new Map(); // Object3D → { inners: [HTMLElement], lines: [Line], dots: [Mesh] }
+
+function registerHover(obj, labelData, extraInners) {
+  const entry = { inners: [], lines: [], dots: [] };
+  const items = Array.isArray(labelData) ? labelData : [labelData];
+  items.forEach(ld => {
+    if (ld.inner) entry.inners.push(ld.inner);
+    if (ld.line) entry.lines.push(ld.line);
+    if (ld.dot) entry.dots.push(ld.dot);
+  });
+  if (extraInners) extraInners.forEach(el => entry.inners.push(el));
+  hoverMap.set(obj, entry);
+}
+
+// Register hover targets
+registerHover(botPatrol, [lblVOC, lblMold], botPatrol.userData.armLabelInners || []);
+registerHover(moldGroup, lblMold);
+registerHover(botSpray, lblSpray, botSpray.userData.armLabelInners || []);
+registerHover(coating, lblCoating);
+registerHover(hubGroup, lblHub);
+registerHover(phoneGroup, lblHub);
+
+function findHoverTarget(obj) {
+  let cur = obj;
+  while (cur) {
+    if (hoverMap.has(cur)) return cur;
+    cur = cur.parent;
+  }
+  return null;
+}
+
+function showLabelsFor(target) {
+  const d = hoverMap.get(target);
+  if (!d) return;
+  d.inners.forEach(el => el.style.opacity = '1');
+  d.lines.forEach(l => l.visible = true);
+  d.dots.forEach(d => d.visible = true);
+}
+
+function hideLabelsFor(target) {
+  const d = hoverMap.get(target);
+  if (!d) return;
+  d.inners.forEach(el => el.style.opacity = '0');
+  d.lines.forEach(l => l.visible = false);
+  d.dots.forEach(d => d.visible = false);
+}
+
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+let currentHovered = null;
+
+renderer.domElement.addEventListener('mousemove', (event) => {
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  const intersects = raycaster.intersectObjects(scene.children, true);
+  let newTarget = null;
+  for (const hit of intersects) {
+    const t = findHoverTarget(hit.object);
+    if (t) { newTarget = t; break; }
+  }
+  if (newTarget !== currentHovered) {
+    if (currentHovered) hideLabelsFor(currentHovered);
+    if (newTarget) showLabelsFor(newTarget);
+    currentHovered = newTarget;
+    renderer.domElement.style.cursor = newTarget ? 'pointer' : '';
+  }
+});
+
+// ==================== ANIMATION ====================
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = clock.getDelta();
+  const t = clock.getElapsedTime();
+
+  // Animate robot patrols
+  botPaths.forEach(rp => {
+    rp.t += dt * rp.speed;
+    const a = (rp.t % 1) * Math.PI * 2;
+    rp.bot.position.x = rp.cx + Math.sin(a) * rp.rx;
+    rp.bot.position.z = rp.cz + Math.cos(a) * rp.rz;
+    // Face direction of travel
+    rp.bot.rotation.y = Math.atan2(Math.cos(a) * rp.rx, -Math.sin(a) * rp.rz);
+  });
+
+  // Float spores
+  spores.forEach(sp => {
+    sp.position.x = sp.userData.basePos.x + Math.sin(t * sp.userData.speed + sp.userData.phase) * 0.2;
+    sp.position.y = sp.userData.basePos.y + Math.cos(t * sp.userData.speed * 0.7 + sp.userData.phase) * 0.15;
+    sp.position.z = sp.userData.basePos.z + Math.sin(t * sp.userData.speed * 0.5 + sp.userData.phase + 1) * 0.25;
+  });
+
+  // Float VOC particles
+  vocParticles.forEach(v => {
+    v.position.x = v.userData.basePos.x + Math.sin(t * v.userData.speed + v.userData.phase) * 0.3;
+    v.position.y = v.userData.basePos.y + Math.cos(t * v.userData.speed * 0.6 + v.userData.phase) * 0.15;
+    v.position.z = v.userData.basePos.z + Math.sin(t * v.userData.speed * 0.4 + v.userData.phase) * 0.2;
+  });
+
+  // Spray particles shimmer
+  sprayParticles.forEach(sp => {
+    sp.position.x = sp.userData.basePos.x + Math.sin(t * 1.5 + sp.userData.phase) * 0.08;
+    sp.position.y = sp.userData.basePos.y + Math.cos(t * 1.2 + sp.userData.phase) * 0.06;
+    sp.material.opacity = 0.3 + Math.sin(t * 2 + sp.userData.phase) * 0.3;
+  });
+
+  // Pulse robot eyes
+  [botPatrol, botSpray].forEach((r, i) => {
+    const eyeL = r.children[3];
+    const eyeR = r.children[4];
+    if (eyeL && eyeL.material && eyeL.material.emissiveIntensity !== undefined) {
+      eyeL.material.emissiveIntensity = 0.7 + Math.sin(t * 3 + i) * 0.3;
+    }
+    if (eyeR && eyeR.material && eyeR.material.emissiveIntensity !== undefined) {
+      eyeR.material.emissiveIntensity = 0.7 + Math.sin(t * 3 + i + 0.5) * 0.3;
+    }
+  });
+
+  // Pulse mold glow (more dramatic)
+  moldGlow.intensity = 1.0 + Math.sin(t * 1.5) * 0.5;
+  alertLight.intensity = 0.5 + Math.sin(t * 3) * 0.5;
+
+  // Pulse bulb
+  bulbLight.intensity = 7.5 + Math.sin(t * 0.5) * 0.5;
+
+  // Hub screen glow
+  hubGlow.intensity = 0.4 + Math.sin(t * 2) * 0.2;
+
+  // Coating shimmer
+  coating.material.opacity = 0.15 + Math.sin(t) * 0.05;
+
+  controls.update();
+  renderer.render(scene, camera);
+  labelRenderer.render(scene, camera);
+}
+animate();
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  labelRenderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+</body>
+</html>
