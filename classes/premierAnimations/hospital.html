@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Narrative A – 3D P-Trap Microbiome Intervention</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a0a12; overflow: hidden; font-family: 'Segoe UI', Tahoma, sans-serif; }
+  #info {
+    position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+    color: #88bbee; font-size: 13px; text-align: center; z-index: 10;
+    background: rgba(10,14,30,0.9); padding: 8px 22px; border-radius: 20px;
+    border: 1px solid rgba(74,158,255,0.25); pointer-events: none;
+  }
+  #info h1 { font-size: 15px; color: #aaddff; margin-bottom: 2px; }
+  #info p { font-size: 10px; color: #6699bb; }
+  .label-3d { position: absolute; pointer-events: none; font-family: 'Segoe UI', sans-serif; }
+  .step-text {
+    padding: 5px 12px; border-radius: 6px;
+    font-size: 10px; color: #dde; white-space: nowrap;
+    background: rgba(10,14,30,0.88); border: 1px solid rgba(100,140,180,0.3);
+    text-align: center; max-width: 220px;
+    font-weight: 600;
+    opacity: 0; transition: opacity 0.25s ease;
+  }
+</style>
+</head>
+<body>
+<div id="info">
+  <h1>Narrative A: P-Trap Biofilm Intervention — Hospital ICU</h1>
+  <p>Drag to orbit &bull; Scroll to zoom &bull; Hover over objects to see labels</p>
+</div>
+
+<script type="importmap">
+{ "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.163.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.163.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1a1c28);
+
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 200);
+camera.position.set(8, 7, 12);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+
+const labelRenderer = new CSS2DRenderer();
+labelRenderer.setSize(window.innerWidth, window.innerHeight);
+labelRenderer.domElement.style.position = 'absolute';
+labelRenderer.domElement.style.top = '0';
+labelRenderer.domElement.style.pointerEvents = 'none';
+document.body.appendChild(labelRenderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.dampingFactor = 0.05;
+controls.target.set(0, 2, -1);
+controls.maxPolarAngle = Math.PI / 1.8;
+controls.minDistance = 4; controls.maxDistance = 35;
+
+// ===== ENVIRONMENT =====
+const pmrem = new THREE.PMREMGenerator(renderer);
+const eScene = new THREE.Scene();
+const eMat = new THREE.ShaderMaterial({ side: THREE.BackSide,
+  uniforms: { top:{value:new THREE.Color(0x3a4a6a)}, bot:{value:new THREE.Color(0x0a0a12)} },
+  vertexShader: `varying float vY; void main(){vY=normalize(position).y;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,
+  fragmentShader: `uniform vec3 top,bot;varying float vY;void main(){gl_FragColor=vec4(mix(bot,top,vY*.5+.5),1.0);}`
+});
+eScene.add(new THREE.Mesh(new THREE.SphereGeometry(50,32,16), eMat));
+scene.environment = pmrem.fromScene(eScene).texture;
+
+// ===== LIGHTING =====
+scene.add(new THREE.AmbientLight(0x445566, 0.5));
+const mainLight = new THREE.DirectionalLight(0xffeedd, 2.0);
+mainLight.position.set(8, 15, 6);
+mainLight.castShadow = true;
+mainLight.shadow.mapSize.set(2048, 2048);
+mainLight.shadow.camera.left = -15; mainLight.shadow.camera.right = 15;
+mainLight.shadow.camera.top = 15; mainLight.shadow.camera.bottom = -15;
+mainLight.shadow.bias = -0.001;
+scene.add(mainLight);
+scene.add(new THREE.DirectionalLight(0x6688bb, 0.5).translateZ(-5).translateY(8));
+const ceilLight = new THREE.PointLight(0xfff0dd, 2, 18, 1.5);
+ceilLight.position.set(0, 5.5, 0); ceilLight.castShadow = true;
+scene.add(ceilLight);
+scene.add(new THREE.PointLight(0xaabbcc, 0.6, 12).translateX(-3).translateY(4).translateZ(2));
+
+// ===== TEXTURES =====
+function mkTex(size, fn) {
+  const c = document.createElement('canvas'); c.width = c.height = size;
+  fn(c.getContext('2d'), size);
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
+}
+const tileTex = mkTex(512, (ctx,s) => {
+  ctx.fillStyle='#c0b8a8'; ctx.fillRect(0,0,s,s);
+  ctx.fillStyle='#e8e4dc';
+  for(let y=0;y<s;y+=64) for(let x=0;x<s;x+=64) ctx.fillRect(x+2,y+2,60,60);
+}); tileTex.repeat.set(3,3);
+const floorTex = mkTex(512, (ctx,s) => {
+  ctx.fillStyle='#a0a0a0'; ctx.fillRect(0,0,s,s);
+  ctx.fillStyle='#d8d8d8';
+  for(let y=0;y<s;y+=128) for(let x=0;x<s;x+=128) ctx.fillRect(x+3,y+3,122,122);
+}); floorTex.repeat.set(2,2);
+
+// ===== MATERIALS =====
+const matWall = new THREE.MeshStandardMaterial({ map: tileTex, roughness: 0.7 });
+const matFloor = new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.5 });
+const matCeil = new THREE.MeshStandardMaterial({ color: 0xf5f0ea, roughness: 0.9 });
+const matPorcelain = new THREE.MeshStandardMaterial({ color: 0xf8f6f2, roughness: 0.15 });
+const matChrome = new THREE.MeshStandardMaterial({ color: 0xcccccc, roughness: 0.05, metalness: 1.0 });
+const matMirror = new THREE.MeshStandardMaterial({ color: 0xaaccdd, roughness: 0.02, metalness: 0.9 });
+const matPipe = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.25, metalness: 0.8 });
+const matBiofilm = new THREE.MeshStandardMaterial({ color: 0x5a4a28, roughness: 0.9, transparent: true, opacity: 0.85 });
+const matBiofilmTreated = new THREE.MeshStandardMaterial({ color: 0x3a6a3a, roughness: 0.8, transparent: true, opacity: 0.6, emissive: 0x1a3a1a, emissiveIntensity: 0.2 });
+const matWater = new THREE.MeshStandardMaterial({ color: 0x4488bb, roughness: 0.1, transparent: true, opacity: 0.4 });
+const matCabinet = new THREE.MeshStandardMaterial({ color: 0x8B7355, roughness: 0.6 });
+const matCountertop = new THREE.MeshStandardMaterial({ color: 0xccc8c0, roughness: 0.3, metalness: 0.1 });
+const matRobotBody = new THREE.MeshStandardMaterial({ color: 0x2a3a5a, roughness: 0.2, metalness: 0.7 });
+const matEyeBlue = new THREE.MeshStandardMaterial({ color: 0x0099ff, emissive: 0x0077cc, emissiveIntensity: 1.0, roughness: 0.1 });
+const matEyeGreen = new THREE.MeshStandardMaterial({ color: 0x33dd66, emissive: 0x22aa44, emissiveIntensity: 1.0, roughness: 0.1 });
+const matEyeRed = new THREE.MeshStandardMaterial({ color: 0xff4444, emissive: 0xcc2222, emissiveIntensity: 1.0, roughness: 0.1 });
+const matEyeOrange = new THREE.MeshStandardMaterial({ color: 0xff9922, emissive: 0xcc7718, emissiveIntensity: 1.0, roughness: 0.1 });
+const matCRE = new THREE.MeshStandardMaterial({ color: 0xdd4444, emissive: 0xaa2222, emissiveIntensity: 0.5 });
+const matAIHub = new THREE.MeshStandardMaterial({ color: 0x0a2a4a, metalness: 0.8, roughness: 0.1, emissive: 0x003366, emissiveIntensity: 0.4 });
+const probColors = [
+  new THREE.MeshStandardMaterial({ color:0x33dd66, emissive:0x22aa44, emissiveIntensity:0.6, transparent:true, opacity:0.8 }),
+  new THREE.MeshStandardMaterial({ color:0x4488ff, emissive:0x2266cc, emissiveIntensity:0.6, transparent:true, opacity:0.8 }),
+  new THREE.MeshStandardMaterial({ color:0xffaa22, emissive:0xcc8818, emissiveIntensity:0.5, transparent:true, opacity:0.8 }),
+  new THREE.MeshStandardMaterial({ color:0xdd66ff, emissive:0xaa44cc, emissiveIntensity:0.5, transparent:true, opacity:0.8 }),
+  new THREE.MeshStandardMaterial({ color:0x66dddd, emissive:0x44aaaa, emissiveIntensity:0.5, transparent:true, opacity:0.8 }),
+];
+const matBedFrame = new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 0.5, roughness: 0.3 });
+const matBedding = new THREE.MeshStandardMaterial({ color: 0xd0dce8, roughness: 0.8 });
+const matPillow = new THREE.MeshStandardMaterial({ color: 0xf0f0f5, roughness: 0.7 });
+const matSkin = new THREE.MeshStandardMaterial({ color: 0xd4a574, roughness: 0.7 });
+const matGown = new THREE.MeshStandardMaterial({ color: 0x88aacc, roughness: 0.7 });
+const matHair = new THREE.MeshStandardMaterial({ color: 0x4a3a2a, roughness: 0.8 });
+
+function box(w,h,d,mat) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);
+  m.castShadow = true; m.receiveShadow = true; return m;
+}
+
+// ===== LABEL WITH LEADER LINE (no numbers — hover only) =====
+function addLabel(text, color, lx,ly,lz, tx,ty,tz) {
+  const div = document.createElement('div');
+  div.className = 'label-3d';
+  const inner = document.createElement('div');
+  inner.className = 'step-text';
+  inner.style.borderLeft = `3px solid ${color}`;
+  inner.innerHTML = text;
+  div.appendChild(inner);
+  const label = new CSS2DObject(div);
+  label.position.set(lx,ly,lz);
+  scene.add(label);
+  let line = null, dot = null;
+  if(tx !== undefined) {
+    const pts = [new THREE.Vector3(lx,ly,lz), new THREE.Vector3(tx,ty,tz)];
+    const lg = new THREE.BufferGeometry().setFromPoints(pts);
+    const lm = new THREE.LineDashedMaterial({ color, dashSize:0.12, gapSize:0.06, transparent:true, opacity:0.55 });
+    line = new THREE.Line(lg, lm); line.computeLineDistances(); line.visible = false; scene.add(line);
+    dot = new THREE.Mesh(new THREE.SphereGeometry(0.05,8,8),
+      new THREE.MeshStandardMaterial({ color, emissive:color, emissiveIntensity:0.5 }));
+    dot.position.set(tx,ty,tz); dot.visible = false; scene.add(dot);
+  }
+  return { inner, line, dot };
+}
+
+// ==================== ROOM STRUCTURE ====================
+const floor = box(14, 0.2, 12, matFloor); floor.position.set(0, -0.1, 0); scene.add(floor);
+const backWall = box(14, 6, 0.2, matWall); backWall.position.set(0, 3, -6); scene.add(backWall);
+const leftWall = box(0.2, 6, 12, matWall); leftWall.position.set(-7, 3, 0); scene.add(leftWall);
+const rightWall = box(0.2, 6, 6, matWall); rightWall.position.set(7, 3, -3); scene.add(rightWall);
+const ceil = box(14, 0.15, 12, matCeil); ceil.position.set(0, 6, 0); scene.add(ceil);
+const slab = box(14, 0.4, 12, new THREE.MeshStandardMaterial({ color:0x888890, roughness:0.85 }));
+slab.position.set(0, -0.4, 0); scene.add(slab);
+
+// ==================== HOSPITAL BED WITH PATIENT ====================
+// Bed frame
+const bedFrame = box(2.2, 0.5, 4.5, matBedFrame);
+bedFrame.position.set(-4.5, 0.6, -2); scene.add(bedFrame);
+// Mattress
+const mattress = box(2, 0.25, 4.2, matBedding);
+mattress.position.set(-4.5, 0.98, -2); scene.add(mattress);
+// Pillow
+const pillow = box(1.5, 0.2, 0.6, matPillow);
+pillow.position.set(-4.5, 1.18, -3.8); scene.add(pillow);
+
+// Bed rails (guardrails)
+for(const xOff of [-1.1, 1.1]) {
+  // Vertical posts
+  for(const zOff of [-3, -1, 1]) {
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.7, 6), matBedFrame);
+    post.position.set(-4.5 + xOff, 1.2, -2 + zOff);
+    scene.add(post);
+  }
+  // Horizontal rail bar
+  const rail = box(0.04, 0.04, 4, matBedFrame);
+  rail.position.set(-4.5 + xOff, 1.5, -2); scene.add(rail);
+}
+// Headboard
+const headboard = box(2.2, 1.2, 0.1, matBedFrame);
+headboard.position.set(-4.5, 1.2, -4.2); scene.add(headboard);
+
+// --- PATIENT ---
+const patientGroup = new THREE.Group();
+// Torso (lying down, under blanket effect)
+const torso = box(1.4, 0.35, 2.2, matGown);
+torso.position.set(0, 1.32, 0);
+patientGroup.add(torso);
+// Blanket over lower body
+const blanket = box(1.6, 0.15, 1.8, matBedding);
+blanket.position.set(0, 1.4, 1.2);
+patientGroup.add(blanket);
+// Head
+const headGeo = new THREE.SphereGeometry(0.22, 12, 10);
+const head = new THREE.Mesh(headGeo, matSkin);
+head.position.set(0, 1.45, -1.3);
+head.scale.set(1, 0.85, 1);
+patientGroup.add(head);
+// Hair
+const hair = new THREE.Mesh(new THREE.SphereGeometry(0.23, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), matHair);
+hair.position.set(0, 1.5, -1.3);
+patientGroup.add(hair);
+// Arms (visible above blanket)
+const armGeo = new THREE.CapsuleGeometry(0.08, 0.6, 4, 8);
+const leftArm = new THREE.Mesh(armGeo, matSkin);
+leftArm.position.set(-0.55, 1.25, 0.3);
+leftArm.rotation.z = 0.2;
+patientGroup.add(leftArm);
+const rightArm = new THREE.Mesh(armGeo, matSkin);
+rightArm.position.set(0.55, 1.25, 0.3);
+rightArm.rotation.z = -0.2;
+patientGroup.add(rightArm);
+
+patientGroup.position.set(-4.5, 0, -1.8);
+scene.add(patientGroup);
+
+// IV pole
+const ivPole = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 3.5, 8), matChrome);
+ivPole.position.set(-3, 2, -3.5); scene.add(ivPole);
+const ivBase = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.3, 0.1, 16), matChrome);
+ivBase.position.set(-3, 0.05, -3.5); scene.add(ivBase);
+const ivBag = box(0.2, 0.35, 0.08, new THREE.MeshStandardMaterial({
+  color: 0xccddee, transparent: true, opacity: 0.5, roughness: 0.1
+}));
+ivBag.position.set(-3, 3.5, -3.5); scene.add(ivBag);
+
+// Bedside monitor
+const monitorStand = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 2, 8), matChrome);
+monitorStand.position.set(-3.2, 1.5, -0.5); scene.add(monitorStand);
+const monitorScreen = box(0.8, 0.6, 0.06, new THREE.MeshStandardMaterial({
+  color: 0x1a1a2a, emissive: 0x003322, emissiveIntensity: 0.4
+}));
+monitorScreen.position.set(-3.2, 2.7, -0.5); scene.add(monitorScreen);
+const hbLine = box(0.6, 0.02, 0.02, new THREE.MeshStandardMaterial({
+  color: 0x44ff66, emissive: 0x22cc44, emissiveIntensity: 1
+}));
+hbLine.position.set(-3.2, 2.7, -0.47); scene.add(hbLine);
+
+// Overhead medical arm
+const medArm = box(2.5, 0.06, 0.06, matChrome);
+medArm.position.set(-4.5, 5, -2); scene.add(medArm);
+
+// ==================== SINK & VANITY (right-center) ====================
+const vanity = box(2.5, 1.8, 1.2, matCabinet); vanity.position.set(2, 0.9, -5.2); scene.add(vanity);
+const counter = box(2.8, 0.12, 1.4, matCountertop); counter.position.set(2, 1.85, -5.2); scene.add(counter);
+const sinkGeo = new THREE.CylinderGeometry(0.5, 0.35, 0.35, 24, 1, true);
+const sink = new THREE.Mesh(sinkGeo, matPorcelain); sink.position.set(2, 1.7, -5.2); scene.add(sink);
+const sinkBot = new THREE.Mesh(new THREE.CircleGeometry(0.35, 24), matPorcelain);
+sinkBot.rotation.x = -Math.PI/2; sinkBot.position.set(2, 1.53, -5.2); scene.add(sinkBot);
+const drain = new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.06,0.1,12), matChrome);
+drain.position.set(2, 1.54, -5.2); scene.add(drain);
+// Faucet
+const fBase = new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.08,0.3,12), matChrome);
+fBase.position.set(2, 2.05, -5.6); scene.add(fBase);
+const fNeck = new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.04,0.5,8), matChrome);
+fNeck.position.set(2, 2.35, -5.45); fNeck.rotation.x = Math.PI/4; scene.add(fNeck);
+// Mirror
+const mirF = box(2, 2.2, 0.08, new THREE.MeshStandardMaterial({ color:0x888888, metalness:0.7, roughness:0.2 }));
+mirF.position.set(2, 4, -5.9); scene.add(mirF);
+const mir = box(1.8, 2, 0.05, matMirror); mir.position.set(2, 4, -5.85); scene.add(mir);
+
+// ==================== P-TRAP PIPE (below sink) ====================
+const pR = 0.12;
+const pG = new THREE.Group(); pG.position.set(2, 0, -5.2);
+
+const tailpiece = new THREE.Mesh(new THREE.CylinderGeometry(pR,pR,1.5,16), matPipe);
+tailpiece.position.set(0, 0.5, 0); pG.add(tailpiece);
+
+const trapCurve = new THREE.Mesh(new THREE.TorusGeometry(0.3, pR, 16, 24, Math.PI), matPipe);
+trapCurve.position.set(0, -0.3, 0); trapCurve.rotation.z = Math.PI/2; trapCurve.rotation.y = Math.PI/2;
+pG.add(trapCurve);
+
+const exitPipe = new THREE.Mesh(new THREE.CylinderGeometry(pR,pR,2.5,16), matPipe);
+exitPipe.rotation.z = Math.PI/2; exitPipe.position.set(1.5, -0.3, 0); pG.add(exitPipe);
+
+const wallPipe = new THREE.Mesh(new THREE.CylinderGeometry(pR,pR,1.5,16), matPipe);
+wallPipe.rotation.z = Math.PI/2; wallPipe.position.set(3.3, -0.3, 0); pG.add(wallPipe);
+
+// Water
+const water = new THREE.Mesh(new THREE.TorusGeometry(0.25, pR*0.7, 12, 16, Math.PI*0.6), matWater);
+water.position.set(0, -0.35, 0); water.rotation.z = Math.PI/2; water.rotation.y = Math.PI/2;
+pG.add(water);
+
+// Biofilm
+const biofilm = new THREE.Mesh(new THREE.TorusGeometry(0.28, pR*0.3, 12, 16, Math.PI*0.8), matBiofilm);
+biofilm.position.set(0, -0.32, 0); biofilm.rotation.z = Math.PI/2; biofilm.rotation.y = Math.PI/2;
+pG.add(biofilm);
+
+// CRE bacteria (red rods)
+const creGeo = new THREE.CapsuleGeometry(0.015, 0.04, 4, 6);
+for(let i=0; i<25; i++) {
+  const angle = (Math.random()-0.5)*Math.PI*0.7;
+  const r = 0.25 + (Math.random()-0.5)*0.08;
+  const cre = new THREE.Mesh(creGeo, matCRE);
+  cre.position.set(Math.sin(angle)*r, -0.32+Math.cos(angle)*r, (Math.random()-0.5)*0.15);
+  cre.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, Math.random()*Math.PI);
+  pG.add(cre);
+}
+
+// Treated zone
+const treatedBiofilm = new THREE.Mesh(
+  new THREE.CylinderGeometry(pR*0.85, pR*0.85, 1.2, 12, 1, true), matBiofilmTreated
+);
+treatedBiofilm.rotation.z = Math.PI/2; treatedBiofilm.position.set(1.8, -0.3, 0);
+pG.add(treatedBiofilm);
+
+// Multi-colored probiotic organisms in treated zone
+const probGeo = new THREE.SphereGeometry(0.02, 6, 6);
+for(let i=0; i<50; i++) {
+  const mat = probColors[i % probColors.length];
+  const prob = new THREE.Mesh(probGeo, mat);
+  const angle = Math.random()*Math.PI*2;
+  const r = 0.06 + Math.random()*0.05;
+  prob.position.set(1.2+Math.random()*1.2, -0.3+Math.sin(angle)*r, Math.cos(angle)*r);
+  pG.add(prob);
+}
+
+scene.add(pG);
+
+// Transparent cutaway
+const cutaway = new THREE.Mesh(new THREE.PlaneGeometry(5,4),
+  new THREE.MeshStandardMaterial({ color:0xcccccc, transparent:true, opacity:0.08, side:THREE.DoubleSide }));
+cutaway.rotation.x = -Math.PI/2; cutaway.position.set(2.5, -0.05, -5.2);
+scene.add(cutaway);
+
+// ==================== PIPE ROBOTS ====================
+function createPipeRobot(eyeMat) {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.08, 0.15, 8, 12), matRobotBody);
+  body.rotation.z = Math.PI/2; g.add(body);
+  const eye = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 8), eyeMat);
+  eye.position.set(0.12, 0, 0); g.add(eye);
+  const el = new THREE.PointLight(eyeMat.emissive || eyeMat.color, 0.4, 1.5);
+  el.position.set(0.12, 0, 0); g.add(el);
+  const gripGeo = new THREE.CylinderGeometry(0.01, 0.015, 0.08, 6);
+  const gripMat = new THREE.MeshStandardMaterial({ color:0x5a6a8a, metalness:0.6, roughness:0.3 });
+  [[-0.05,0.1],[-0.05,-0.1],[0.05,0.1],[0.05,-0.1]].forEach(([x,z])=>{
+    const grip = new THREE.Mesh(gripGeo, gripMat); grip.position.set(x,0,z); g.add(grip);
+  });
+  return g;
+}
+
+const botEnter = createPipeRobot(matEyeBlue);
+botEnter.position.set(2, 1.1, -5.2); botEnter.rotation.z = Math.PI/2;
+scene.add(botEnter);
+
+const botScan = createPipeRobot(matEyeRed);
+botScan.position.set(2, -0.1, -5.2);
+scene.add(botScan);
+
+const botDeploy = createPipeRobot(matEyeGreen);
+botDeploy.position.set(3.2, -0.3, -5.2);
+scene.add(botDeploy);
+
+// Spray particles
+const sprayGroup = new THREE.Group();
+for(let i=0; i<35; i++) {
+  const mat = probColors[i % probColors.length];
+  const sp = new THREE.Mesh(new THREE.SphereGeometry(0.015, 6, 6), mat);
+  sp.position.set(3.2+0.15+Math.random()*0.6, -0.3+(Math.random()-0.5)*0.15, -5.2+(Math.random()-0.5)*0.15);
+  sp.userData.basePos = sp.position.clone();
+  sprayGroup.add(sp);
+}
+scene.add(sprayGroup);
+
+// ==================== ROOMBA BOTS (patrol the room) ====================
+function createRoombaBot(eyeColor, emissiveColor, label) {
+  const g = new THREE.Group();
+  g.userData = { label };
+  // Disc body
+  const bodyGeo = new THREE.CylinderGeometry(0.5, 0.5, 0.16, 20);
+  const bodyMesh = new THREE.Mesh(bodyGeo, matRobotBody);
+  bodyMesh.castShadow = true;
+  g.add(bodyMesh);
+  // Top dome
+  const domeGeo = new THREE.SphereGeometry(0.22, 14, 8, 0, Math.PI*2, 0, Math.PI/2);
+  const dome = new THREE.Mesh(domeGeo, matRobotBody);
+  dome.position.y = 0.08;
+  g.add(dome);
+  // Eyes
+  const eyeMat = new THREE.MeshStandardMaterial({
+    color: eyeColor, emissive: emissiveColor, emissiveIntensity: 1.0, roughness: 0.1
+  });
+  const eyeGeo = new THREE.SphereGeometry(0.06, 8, 8);
+  const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
+  leftEye.position.set(-0.1, 0.2, 0.14);
+  g.add(leftEye);
+  const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
+  rightEye.position.set(0.1, 0.2, 0.14);
+  g.add(rightEye);
+  // Front sensor bar
+  const sensorBar = box(0.35, 0.025, 0.025, new THREE.MeshStandardMaterial({
+    color: eyeColor, emissive: emissiveColor, emissiveIntensity: 0.5
+  }));
+  sensorBar.position.set(0, 0.08, 0.48);
+  g.add(sensorBar);
+  // LED ring
+  const ringGeo = new THREE.TorusGeometry(0.47, 0.012, 8, 28);
+  const ring = new THREE.Mesh(ringGeo, new THREE.MeshStandardMaterial({
+    color: eyeColor, emissive: emissiveColor, emissiveIntensity: 0.6, transparent: true, opacity: 0.8
+  }));
+  ring.rotation.x = Math.PI / 2;
+  ring.position.y = 0.04;
+  g.add(ring);
+  // Eye glow
+  const el = new THREE.PointLight(eyeColor, 0.3, 2);
+  el.position.set(0, 0.25, 0.2);
+  g.add(el);
+  return g;
+}
+
+// Create 3 roomba bots that patrol the room floor
+const roomba1 = createRoombaBot(0x0099ff, 0x0077cc, 'Surface Sampler');
+roomba1.position.set(-2, 0.08, 2);
+scene.add(roomba1);
+
+const roomba2 = createRoombaBot(0xff9922, 0xcc7718, 'Air Quality Bot');
+roomba2.position.set(4, 0.08, 1);
+scene.add(roomba2);
+
+const roomba3 = createRoombaBot(0x33dd66, 0x22aa44, 'UV Sterilizer');
+roomba3.position.set(-1, 0.08, -3);
+scene.add(roomba3);
+
+// Roomba bot labels (parented to bots so they follow them)
+function addBotLabel(text, color, bot) {
+  const div = document.createElement('div');
+  div.className = 'label-3d';
+  const inner = document.createElement('div');
+  inner.className = 'step-text';
+  inner.style.borderLeft = `3px solid ${color}`;
+  inner.innerHTML = text;
+  div.appendChild(inner);
+  const label = new CSS2DObject(div);
+  label.position.set(0, 1.0, 0);
+  bot.add(label);
+  return { inner, line: null, dot: null };
+}
+const lblBot1 = addBotLabel('Surface Sampler', '#0099ff', roomba1);
+const lblBot2 = addBotLabel('Air Quality Bot', '#ff9922', roomba2);
+const lblBot3 = addBotLabel('UV Sterilizer', '#33dd66', roomba3);
+
+// Roomba patrol paths
+const roombaPaths = [
+  { bot: roomba1, cx: -1, cz: 1.5, rx: 3.5, rz: 2.5, speed: 0.04, t: 0 },
+  { bot: roomba2, cx: 3, cz: 0, rx: 2.5, rz: 3, speed: 0.03, t: 0.33 },
+  { bot: roomba3, cx: -2, cz: -2, rx: 3, rz: 2, speed: 0.035, t: 0.66 },
+];
+
+// ==================== AI HUB (on wall) ====================
+const hubGroup = new THREE.Group();
+hubGroup.add(box(1.4, 0.9, 0.06, matAIHub));
+const hubFace = box(1.1, 0.65, 0.02, new THREE.MeshStandardMaterial({
+  color:0x001828, emissive:0x0066aa, emissiveIntensity:0.7
+}));
+hubFace.position.z = 0.04; hubGroup.add(hubFace);
+const hubGlow = new THREE.PointLight(0x00ddff, 1, 4);
+hubGlow.position.set(0, 0, 0.5); hubGroup.add(hubGlow);
+hubGroup.position.set(-6.9, 3.5, -2);
+hubGroup.rotation.y = Math.PI/2;
+scene.add(hubGroup);
+
+// ==================== COMMUNICATION BEAM ====================
+const commParticles = [];
+const commMat = new THREE.MeshStandardMaterial({
+  color: 0x00ddff, emissive: 0x0088cc, emissiveIntensity: 1,
+  transparent: true, opacity: 0.7
+});
+for(let i=0; i<30; i++) {
+  const p = new THREE.Mesh(new THREE.SphereGeometry(0.03, 6, 6), commMat);
+  p.userData.t = Math.random();
+  p.userData.speed = 0.3 + Math.random()*0.3;
+  scene.add(p);
+  commParticles.push(p);
+}
+const beamPts = [new THREE.Vector3(2, 0.2, -5.2), new THREE.Vector3(-2, 2, -3), new THREE.Vector3(-6.5, 3.5, -2)];
+const beamCurve = new THREE.CatmullRomCurve3(beamPts);
+const beamLineGeo = new THREE.BufferGeometry().setFromPoints(beamCurve.getPoints(40));
+const beamLine = new THREE.Line(beamLineGeo, new THREE.LineBasicMaterial({ color:0x00aadd, transparent:true, opacity:0.2 }));
+scene.add(beamLine);
+
+// ==================== ZOOMED INSET: competitive exclusion ====================
+const insetGroup = new THREE.Group();
+insetGroup.position.set(6, 3, 2);
+
+const insetFrame = box(2.5, 1.8, 0.08, new THREE.MeshStandardMaterial({
+  color: 0x1a1a2e, metalness: 0.5, roughness: 0.2
+}));
+insetGroup.add(insetFrame);
+const insetBg = box(2.3, 1.6, 0.02, new THREE.MeshStandardMaterial({
+  color: 0x2a2a35, roughness: 0.8
+}));
+insetBg.position.z = 0.04; insetGroup.add(insetBg);
+
+// "Before" side — mostly red CRE
+for(let i=0; i<20; i++) {
+  const cre = new THREE.Mesh(new THREE.CapsuleGeometry(0.03, 0.06, 4, 6), matCRE);
+  cre.position.set(-0.6 + (Math.random()-0.5)*0.9, (Math.random()-0.5)*1.2, 0.07);
+  cre.rotation.z = Math.random()*Math.PI;
+  insetGroup.add(cre);
+}
+for(let i=0; i<3; i++) {
+  const c = new THREE.Mesh(new THREE.SphereGeometry(0.04, 6, 6), probColors[i]);
+  c.position.set(-0.6+(Math.random()-0.5)*0.8, (Math.random()-0.5)*1.0, 0.07);
+  insetGroup.add(c);
+}
+// Arrow
+const arrowShaft = box(0.02, 0.02, 0.5, new THREE.MeshStandardMaterial({ color:0xffffff, emissive:0xffffff, emissiveIntensity:0.5 }));
+arrowShaft.rotation.z = Math.PI/2; arrowShaft.position.set(0, 0, 0.07);
+insetGroup.add(arrowShaft);
+// "After" side
+for(let i=0; i<25; i++) {
+  const mat = probColors[i % probColors.length];
+  const p = new THREE.Mesh(new THREE.SphereGeometry(0.04 + Math.random()*0.02, 6, 6), mat);
+  p.position.set(0.6 + (Math.random()-0.5)*0.9, (Math.random()-0.5)*1.2, 0.07);
+  insetGroup.add(p);
+}
+for(let i=0; i<3; i++) {
+  const cre = new THREE.Mesh(new THREE.CapsuleGeometry(0.02, 0.03, 4, 6),
+    new THREE.MeshStandardMaterial({ color:0xdd4444, emissive:0x882222, emissiveIntensity:0.2, transparent:true, opacity:0.4 }));
+  cre.position.set(0.7+(Math.random()-0.5)*0.5, (Math.random()-0.5)*0.8, 0.07);
+  cre.rotation.z = Math.random()*Math.PI;
+  insetGroup.add(cre);
+}
+// Labels on inset
+const lblBefore = box(0.6, 0.2, 0.02, new THREE.MeshStandardMaterial({ color:0xdd4444, emissive:0xaa2222, emissiveIntensity:0.5 }));
+lblBefore.position.set(-0.6, -0.7, 0.06); insetGroup.add(lblBefore);
+const lblAfter = box(0.6, 0.2, 0.02, new THREE.MeshStandardMaterial({ color:0x33dd66, emissive:0x22aa44, emissiveIntensity:0.5 }));
+lblAfter.position.set(0.6, -0.7, 0.06); insetGroup.add(lblAfter);
+
+insetGroup.add(new THREE.PointLight(0x4488ff, 0.5, 3).translateZ(0.5));
+const magLine = new THREE.Line(
+  new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(6, 3, 2), new THREE.Vector3(3.8, -0.3, -5.2)]),
+  new THREE.LineDashedMaterial({ color:0x6688aa, dashSize:0.15, gapSize:0.08, transparent:true, opacity:0.3 })
+);
+magLine.computeLineDistances(); scene.add(magLine);
+scene.add(insetGroup);
+
+// ==================== DASHBOARD ====================
+const dashGroup = new THREE.Group();
+dashGroup.add(box(1.2, 0.8, 0.05, matAIHub));
+const dashFace = box(1.0, 0.6, 0.02, new THREE.MeshStandardMaterial({
+  color:0x0a1828, emissive:0x0a3050, emissiveIntensity:0.5
+}));
+dashFace.position.z = 0.04; dashGroup.add(dashFace);
+const checkGlow = new THREE.PointLight(0x33ff66, 0.5, 2);
+checkGlow.position.set(0,0,0.3); dashGroup.add(checkGlow);
+dashGroup.position.set(-6.9, 2, 2);
+dashGroup.rotation.y = Math.PI/2;
+scene.add(dashGroup);
+
+// ==================== EXTRA DETAILS ====================
+scene.add(box(1.5, 0.03, 0.8, new THREE.MeshStandardMaterial({ color:0x556677, roughness:0.9 })).translateY(0.02).translateZ(-4).translateX(2));
+const sanitizer = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.25, 8),
+  new THREE.MeshStandardMaterial({ color:0xeeeeff, roughness:0.2, transparent:true, opacity:0.7 }));
+sanitizer.position.set(3.3, 2.0, -5.2); scene.add(sanitizer);
+
+// ==================== STEP LABELS (hover-only) ====================
+const lblDeploy = addLabel('MicroBot deployed<br>into sink drain',
+  '#0077bb',  5.5,  5.5,  -4,     2,   1.1,  -5.2);
+
+const lblCRE = addLabel('CRE biofilm detected<br>in p-trap curve',
+  '#dd4444', -5,   1.5,   3,      2,  -0.1,  -5.2);
+
+const lblComm = addLabel('Bot communicates with<br>AI Hub — selects protocol',
+  '#00aacc', -8,   4.5,  -5,     -6.5, 3.5,  -2);
+
+const lblProbiotic = addLabel('Probiotic cocktail<br>deployed onto biofilm',
+  '#22aa44',  6.5,  1,    -6,     3.2, -0.3, -5.2);
+
+const lblExclusion = addLabel('Competitive exclusion:<br>CRE displaced by probiotics',
+  '#6644cc',  9,    4.5,   4,     6,    3,    2);
+
+const lblReport = addLabel('AI Hub reports results<br>to clinical stakeholders',
+  '#0066aa', -8.5,  1.5,   4,    -6.5,  2,    2);
+
+// ==================== HOVER SYSTEM ====================
+const hoverMap = new Map();
+
+function registerHover(obj, labelData) {
+  const entry = { inners: [], lines: [], dots: [] };
+  const items = Array.isArray(labelData) ? labelData : [labelData];
+  items.forEach(ld => {
+    if (ld.inner) entry.inners.push(ld.inner);
+    if (ld.line) entry.lines.push(ld.line);
+    if (ld.dot) entry.dots.push(ld.dot);
+  });
+  hoverMap.set(obj, entry);
+}
+
+// Register hover targets — direct objects/groups
+registerHover(botEnter, lblDeploy);
+registerHover(sink, lblDeploy);
+registerHover(drain, lblDeploy);
+registerHover(vanity, lblDeploy);
+registerHover(counter, lblDeploy);
+registerHover(botScan, lblCRE);
+registerHover(pG, [lblCRE, lblProbiotic]);
+registerHover(hubGroup, lblComm);
+registerHover(botDeploy, lblProbiotic);
+registerHover(sprayGroup, lblProbiotic);
+registerHover(insetGroup, lblExclusion);
+registerHover(dashGroup, lblReport);
+registerHover(patientGroup, lblDeploy);
+
+// Roomba bots — labels follow the bot
+registerHover(roomba1, lblBot1);
+registerHover(roomba2, lblBot2);
+registerHover(roomba3, lblBot3);
+
+function findHoverTarget(obj) {
+  let cur = obj;
+  while (cur) {
+    if (hoverMap.has(cur)) return cur;
+    cur = cur.parent;
+  }
+  return null;
+}
+
+function showLabelsFor(target) {
+  const d = hoverMap.get(target);
+  if (!d) return;
+  d.inners.forEach(el => el.style.opacity = '1');
+  d.lines.forEach(l => l.visible = true);
+  d.dots.forEach(d => d.visible = true);
+}
+
+function hideLabelsFor(target) {
+  const d = hoverMap.get(target);
+  if (!d) return;
+  d.inners.forEach(el => el.style.opacity = '0');
+  d.lines.forEach(l => l.visible = false);
+  d.dots.forEach(d => d.visible = false);
+}
+
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+let currentHovered = null;
+
+renderer.domElement.addEventListener('mousemove', (event) => {
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  const intersects = raycaster.intersectObjects(scene.children, true);
+  let newTarget = null;
+  for (const hit of intersects) {
+    const t = findHoverTarget(hit.object);
+    if (t) { newTarget = t; break; }
+  }
+  if (newTarget !== currentHovered) {
+    if (currentHovered) hideLabelsFor(currentHovered);
+    if (newTarget) showLabelsFor(newTarget);
+    currentHovered = newTarget;
+    renderer.domElement.style.cursor = newTarget ? 'pointer' : '';
+  }
+});
+
+// ==================== ANIMATION ====================
+const clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = clock.getDelta();
+  const t = clock.getElapsedTime();
+
+  // Pulse robot eyes
+  [botEnter, botScan, botDeploy].forEach((bot,i) => {
+    if(bot.children[1]) bot.children[1].material.emissiveIntensity = 0.7 + Math.sin(t*3+i)*0.3;
+  });
+
+  // Spray particles shimmer
+  sprayGroup.children.forEach((sp, i) => {
+    const off = i*0.2;
+    sp.position.x = sp.userData.basePos.x + Math.sin(t*2+off)*0.05;
+    sp.position.y = sp.userData.basePos.y + Math.cos(t*1.5+off)*0.03;
+    sp.position.z = sp.userData.basePos.z + Math.sin(t*1.8+off)*0.04;
+    if(sp.material.opacity !== undefined) sp.material.opacity = 0.4 + Math.sin(t*2+off)*0.3;
+  });
+
+  // Communication particles
+  commParticles.forEach(p => {
+    p.userData.t += dt * p.userData.speed * 0.3;
+    if(p.userData.t > 1) p.userData.t -= 1;
+    const pos = beamCurve.getPoint(p.userData.t);
+    p.position.copy(pos);
+    p.position.x += (Math.random()-0.5)*0.05;
+    p.position.y += (Math.random()-0.5)*0.05;
+    p.material.opacity = 0.4 + Math.sin(p.userData.t * Math.PI)*0.5;
+  });
+
+  // Roomba bot patrol animation
+  roombaPaths.forEach(rp => {
+    rp.t += dt * rp.speed;
+    const a = (rp.t % 1) * Math.PI * 2;
+    rp.bot.position.x = rp.cx + Math.sin(a) * rp.rx;
+    rp.bot.position.z = rp.cz + Math.cos(a) * rp.rz;
+    rp.bot.rotation.y = Math.atan2(Math.cos(a) * rp.rx, -Math.sin(a) * rp.rz);
+  });
+
+  // Pulse roomba eyes
+  [roomba1, roomba2, roomba3].forEach((r, i) => {
+    const eyeL = r.children[2];
+    const eyeR = r.children[3];
+    if(eyeL && eyeL.material) eyeL.material.emissiveIntensity = 0.7 + Math.sin(t*3+i*2)*0.3;
+    if(eyeR && eyeR.material) eyeR.material.emissiveIntensity = 0.7 + Math.sin(t*3+i*2+0.5)*0.3;
+  });
+
+  // Pulse glows
+  checkGlow.intensity = 0.3 + Math.sin(t*2)*0.2;
+  hubGlow.intensity = 0.7 + Math.sin(t*1.5)*0.3;
+
+  // CRE pulse
+  pG.children.forEach(child => {
+    if(child.material === matCRE) child.material.emissiveIntensity = 0.3 + Math.sin(t*3+child.position.x*10)*0.2;
+  });
+
+  // Inset slight hover
+  insetGroup.position.y = 3 + Math.sin(t*0.8)*0.1;
+
+  controls.update();
+  renderer.render(scene, camera);
+  labelRenderer.render(scene, camera);
+}
+animate();
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  labelRenderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+</body>
+</html>
