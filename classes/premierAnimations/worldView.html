@@ -1,0 +1,1253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Figure 1C – 3D Interactive: Intelligent Microbiome Management (Enhanced)</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a0e1a; overflow: hidden; font-family: 'Segoe UI', Tahoma, sans-serif; }
+  #info {
+    position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+    color: #88bbee; font-size: 13px; text-align: center; z-index: 10;
+    background: rgba(10,14,30,0.85); padding: 8px 20px; border-radius: 20px;
+    border: 1px solid rgba(74,158,255,0.3);
+  }
+  #info h1 { font-size: 16px; color: #aaddff; margin-bottom: 2px; letter-spacing: 1px; }
+  #info p { font-size: 11px; color: #6699bb; }
+  #legend {
+    position: absolute; bottom: 15px; left: 15px; z-index: 10;
+    background: rgba(10,14,30,0.9); padding: 12px 16px; border-radius: 10px;
+    border: 1px solid rgba(74,158,255,0.2); color: #88aacc; font-size: 11px;
+    max-height: 90vh; overflow-y: auto;
+  }
+  #legend h3 { color: #aaddff; font-size: 12px; margin-bottom: 6px; }
+  #legend .item { display: flex; align-items: center; margin: 3px 0; }
+  #legend .dot { width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; flex-shrink: 0; }
+  #tooltip {
+    position: absolute; display: none; z-index: 20;
+    background: rgba(10,20,40,0.95); color: #aaddff; padding: 8px 14px;
+    border-radius: 8px; border: 1px solid rgba(74,158,255,0.5);
+    font-size: 11px; pointer-events: none; max-width: 240px;
+  }
+  #tooltip .tt-title { font-weight: bold; font-size: 12px; color: #4ac0ff; margin-bottom: 3px; }
+  .scene-label {
+    position: absolute; z-index: 15; pointer-events: none;
+    font-family: 'Segoe UI', Tahoma, sans-serif; font-size: 15px; font-weight: 600;
+    color: #ddeeff; text-align: center; white-space: nowrap;
+    text-shadow: 0 0 8px rgba(0,0,0,0.9), 0 0 20px rgba(0,100,200,0.4);
+    letter-spacing: 0.5px; transition: opacity 0.3s;
+  }
+  .scene-label .label-accent {
+    display: block; width: 40px; height: 3px; margin: 4px auto 0;
+    border-radius: 2px;
+  }
+</style>
+</head>
+<body>
+
+<div id="info">
+  <h1>Intelligent Built-Environment Microbiome Management</h1>
+  <p>Click &amp; drag to orbit &bull; Scroll to zoom &bull; Hover robots for details</p>
+</div>
+
+<div id="legend">
+  <h3>Agents &amp; Systems</h3>
+  <div class="item"><div class="dot" style="background:#0099ff"></div> Sensor / Patrol Bot</div>
+  <div class="item"><div class="dot" style="background:#33dd66"></div> Intervention / Spray Bot</div>
+  <div class="item"><div class="dot" style="background:#ff9922"></div> Air Quality / Monitor Bot</div>
+  <div class="item"><div class="dot" style="background:#ff66aa"></div> P-trap / MicroBot</div>
+  <div class="item"><div class="dot" style="background:#66ccff"></div> Supply / Logistics Bot</div>
+  <div class="item"><div class="dot" style="background:#ffcc33"></div> Data Room Sentry</div>
+  <div class="item"><div class="dot" style="background:#ff4466"></div> Pathogen Detection Alert</div>
+  <div class="item"><div class="dot" style="background:#00ddff"></div> AI Hub (Central &amp; Local)</div>
+  <div class="item"><div class="dot" style="background:#aa88ff"></div> Data Communication Link</div>
+  <div class="item"><div class="dot" style="background:#44ff88"></div> Server Room / Smart Hub</div>
+</div>
+
+<div id="tooltip">
+  <div class="tt-title"></div>
+  <div class="tt-body"></div>
+</div>
+
+<div id="labelHospital" class="scene-label">Use Case 1: Hospital<span class="label-accent" style="background:#cc3333"></span></div>
+<div id="labelHome" class="scene-label">Use Case 2: Home<span class="label-accent" style="background:#e8c840"></span></div>
+<div id="labelHub" class="scene-label">Central AI Hub<span class="label-accent" style="background:#00ddff"></span></div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.163.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.163.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ==================== SCENE SETUP ====================
+const scene = new THREE.Scene();
+
+// Sky gradient background (dusk feel)
+const skyCanvas = document.createElement('canvas');
+skyCanvas.width = 2; skyCanvas.height = 512;
+const skyCtx = skyCanvas.getContext('2d');
+const skyGrad = skyCtx.createLinearGradient(0, 0, 0, 512);
+skyGrad.addColorStop(0, '#0b1228');
+skyGrad.addColorStop(0.3, '#1a2a4a');
+skyGrad.addColorStop(0.6, '#2a3a5a');
+skyGrad.addColorStop(0.8, '#3a4a6a');
+skyGrad.addColorStop(1.0, '#4a5a70');
+skyCtx.fillStyle = skyGrad;
+skyCtx.fillRect(0, 0, 2, 512);
+const skyTexture = new THREE.CanvasTexture(skyCanvas);
+scene.background = skyTexture;
+scene.fog = new THREE.FogExp2(0x1a2a3a, 0.006);
+
+const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 500);
+camera.position.set(40, 32, 45);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.3;
+document.body.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+controls.target.set(0, 5, 0);
+controls.maxPolarAngle = Math.PI / 2.1;
+controls.minDistance = 15;
+controls.maxDistance = 100;
+
+// ==================== LIGHTING ====================
+const ambient = new THREE.AmbientLight(0x445566, 0.7);
+scene.add(ambient);
+
+const dirLight = new THREE.DirectionalLight(0xffeedd, 1.2);
+dirLight.position.set(25, 35, 20);
+dirLight.castShadow = true;
+dirLight.shadow.mapSize.set(2048, 2048);
+dirLight.shadow.camera.left = -50;
+dirLight.shadow.camera.right = 50;
+dirLight.shadow.camera.top = 50;
+dirLight.shadow.camera.bottom = -50;
+scene.add(dirLight);
+
+const fillLight = new THREE.DirectionalLight(0x4488cc, 0.35);
+fillLight.position.set(-15, 10, -10);
+scene.add(fillLight);
+
+const hubGlow1 = new THREE.PointLight(0x00ddff, 2, 15);
+hubGlow1.position.set(0, 22, 0);
+scene.add(hubGlow1);
+
+// ==================== PROCEDURAL TEXTURES ====================
+function createAsphaltTexture() {
+  const c = document.createElement('canvas');
+  c.width = 256; c.height = 256;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#3a3a3e';
+  ctx.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 3000; i++) {
+    const x = Math.random() * 256;
+    const y = Math.random() * 256;
+    const v = 40 + Math.random() * 30;
+    ctx.fillStyle = `rgb(${v},${v},${v})`;
+    ctx.fillRect(x, y, 1 + Math.random() * 2, 1 + Math.random() * 2);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(4, 4);
+  return t;
+}
+
+function createGrassTexture() {
+  const c = document.createElement('canvas');
+  c.width = 128; c.height = 128;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#2a5a2a';
+  ctx.fillRect(0, 0, 128, 128);
+  for (let i = 0; i < 1500; i++) {
+    const x = Math.random() * 128;
+    const y = Math.random() * 128;
+    const g = 60 + Math.random() * 60;
+    ctx.fillStyle = `rgb(${20 + Math.random() * 20},${g},${15 + Math.random() * 15})`;
+    ctx.fillRect(x, y, 1, 2 + Math.random() * 3);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(6, 6);
+  return t;
+}
+
+function createDashboardTexture(w, h) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#0a1020';
+  ctx.fillRect(0, 0, w, h);
+  // Grid lines
+  ctx.strokeStyle = '#1a3050';
+  ctx.lineWidth = 1;
+  for (let x = 0; x < w; x += 20) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
+  for (let y = 0; y < h; y += 20) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
+  // Status bars
+  const colors = ['#00ccff', '#33ff66', '#ff9922', '#ff4466', '#aa88ff', '#ffcc33'];
+  const barH = Math.floor(h / 8);
+  for (let i = 0; i < 6; i++) {
+    const bw = (0.3 + Math.random() * 0.6) * (w * 0.8);
+    const by = 10 + i * (barH + 4);
+    ctx.fillStyle = colors[i % colors.length];
+    ctx.globalAlpha = 0.7;
+    ctx.fillRect(10, by, bw, barH - 2);
+    // Label block
+    ctx.globalAlpha = 0.4;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(10, by, 4, barH - 2);
+  }
+  ctx.globalAlpha = 1.0;
+  // Waveform
+  ctx.strokeStyle = '#00ffaa';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  const waveY = h * 0.85;
+  for (let x = 0; x < w; x += 2) {
+    ctx.lineTo(x, waveY + Math.sin(x * 0.08) * 8 + Math.random() * 4);
+  }
+  ctx.stroke();
+  return new THREE.CanvasTexture(c);
+}
+
+// ==================== MATERIALS ====================
+const matFloor = new THREE.MeshStandardMaterial({ color: 0xd8dce0, roughness: 0.6 });
+const matWallHosp = new THREE.MeshStandardMaterial({ color: 0xe0e8f0, roughness: 0.5, transparent: true, opacity: 0.5 });
+const matWallHome = new THREE.MeshStandardMaterial({ color: 0xf0e8d0, roughness: 0.5, transparent: true, opacity: 0.5 });
+const matWallSolid = new THREE.MeshStandardMaterial({ color: 0xc8c0b0, roughness: 0.6 });
+const matRoof = new THREE.MeshStandardMaterial({ color: 0x6b3a1a, roughness: 0.7 });
+const matBasement = new THREE.MeshStandardMaterial({ color: 0x3a3a42, roughness: 0.8, transparent: true, opacity: 0.4 });
+const matGlass = new THREE.MeshStandardMaterial({ color: 0x88ccee, transparent: true, opacity: 0.3, roughness: 0.1 });
+const matDoor = new THREE.MeshStandardMaterial({ color: 0x5a3010, roughness: 0.6 });
+const matBed = new THREE.MeshStandardMaterial({ color: 0xb8c8d8, roughness: 0.5 });
+const matMold = new THREE.MeshStandardMaterial({ color: 0x2d5a1e, emissive: 0x1a3a0e, emissiveIntensity: 0.3 });
+const matAlert = new THREE.MeshStandardMaterial({ color: 0xff4444, emissive: 0xff2222, emissiveIntensity: 0.5 });
+const matMetal = new THREE.MeshStandardMaterial({ color: 0x888899, metalness: 0.6, roughness: 0.3 });
+const matDarkMetal = new THREE.MeshStandardMaterial({ color: 0x333338, metalness: 0.5, roughness: 0.4 });
+const matServerRack = new THREE.MeshStandardMaterial({ color: 0x222228, metalness: 0.7, roughness: 0.3 });
+const matFurniture = new THREE.MeshStandardMaterial({ color: 0x8b7355, roughness: 0.6 });
+const matCounter = new THREE.MeshStandardMaterial({ color: 0xaaaaaa, metalness: 0.2, roughness: 0.4 });
+const matAppliance = new THREE.MeshStandardMaterial({ color: 0xdddddd, metalness: 0.3, roughness: 0.3 });
+const matCushion = new THREE.MeshStandardMaterial({ color: 0x6a5a4a, roughness: 0.7 });
+
+// Robot materials
+const matRobotBody = new THREE.MeshStandardMaterial({ color: 0x2a3a5a, metalness: 0.6, roughness: 0.3 });
+const matRobotEyeBlue = new THREE.MeshStandardMaterial({ color: 0x0099ff, emissive: 0x0077cc, emissiveIntensity: 0.8 });
+const matRobotEyeGreen = new THREE.MeshStandardMaterial({ color: 0x33dd66, emissive: 0x22aa44, emissiveIntensity: 0.8 });
+const matRobotEyeOrange = new THREE.MeshStandardMaterial({ color: 0xff9922, emissive: 0xcc7718, emissiveIntensity: 0.8 });
+const matRobotEyePink = new THREE.MeshStandardMaterial({ color: 0xff66aa, emissive: 0xcc4488, emissiveIntensity: 0.8 });
+const matRobotEyeCyan = new THREE.MeshStandardMaterial({ color: 0x66ccff, emissive: 0x4499cc, emissiveIntensity: 0.8 });
+const matRobotEyeYellow = new THREE.MeshStandardMaterial({ color: 0xffcc33, emissive: 0xcc9922, emissiveIntensity: 0.8 });
+const matAIHub = new THREE.MeshStandardMaterial({ color: 0x0a2a4a, metalness: 0.7, roughness: 0.2, emissive: 0x0055aa, emissiveIntensity: 0.3 });
+const matHubScreen = new THREE.MeshStandardMaterial({ color: 0x00ddff, emissive: 0x00aacc, emissiveIntensity: 1.0 });
+
+// ==================== HELPER FUNCTIONS ====================
+function makeBox(w, h, d, mat, x, y, z) {
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+  mesh.position.set(x, y, z);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  return mesh;
+}
+
+function createRobot(eyeMat, label, tooltipText, scale) {
+  const s = scale || 1;
+  const group = new THREE.Group();
+  group.userData = { label, tooltip: tooltipText, isRobot: true };
+
+  const body = makeBox(1.2 * s, 0.7 * s, 0.8 * s, matRobotBody, 0, 0.55 * s, 0);
+  group.add(body);
+
+  const head = makeBox(0.9 * s, 0.5 * s, 0.6 * s, matRobotBody, 0, 1.05 * s, 0);
+  group.add(head);
+
+  const eyeGeo = new THREE.SphereGeometry(0.12 * s, 12, 12);
+  const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
+  leftEye.position.set(-0.2 * s, 1.1 * s, 0.31 * s);
+  group.add(leftEye);
+  const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
+  rightEye.position.set(0.2 * s, 1.1 * s, 0.31 * s);
+  group.add(rightEye);
+
+  const antenna = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.03 * s, 0.03 * s, 0.5 * s, 8),
+    new THREE.MeshStandardMaterial({ color: 0x6688aa, metalness: 0.8 })
+  );
+  antenna.position.set(0, 1.55 * s, 0);
+  group.add(antenna);
+
+  const tip = new THREE.Mesh(new THREE.SphereGeometry(0.08 * s, 8, 8), eyeMat);
+  tip.position.set(0, 1.82 * s, 0);
+  group.add(tip);
+
+  const wheelGeo = new THREE.CylinderGeometry(0.18 * s, 0.18 * s, 0.15 * s, 12);
+  const wheelMat = new THREE.MeshStandardMaterial({ color: 0x333338, roughness: 0.4 });
+  [-0.45, 0.45].forEach(xo => {
+    [-0.25, 0.25].forEach(zo => {
+      const wheel = new THREE.Mesh(wheelGeo, wheelMat);
+      wheel.rotation.z = Math.PI / 2;
+      wheel.position.set(xo * s, 0.18 * s, zo * s);
+      group.add(wheel);
+    });
+  });
+
+  const eyeLight = new THREE.PointLight(eyeMat.color, 0.4, 3 * s);
+  eyeLight.position.set(0, 1.1 * s, 0.5 * s);
+  group.add(eyeLight);
+
+  return group;
+}
+
+function createAIHub(isLocal) {
+  const group = new THREE.Group();
+  const s = isLocal ? 0.7 : 1.0;
+
+  const housing = makeBox(2 * s, 1.2 * s, 0.4 * s, matAIHub, 0, 0, 0);
+  group.add(housing);
+
+  const screen = makeBox(1.5 * s, 0.7 * s, 0.05 * s, matHubScreen, 0, 0.05, 0.2 * s);
+  group.add(screen);
+
+  const glow = new THREE.PointLight(0x00ddff, isLocal ? 1 : 3, isLocal ? 6 : 12);
+  glow.position.set(0, 0, 0.5 * s);
+  group.add(glow);
+
+  return group;
+}
+
+function createServerRack(height) {
+  const h = height || 3;
+  const group = new THREE.Group();
+  // Main cabinet
+  group.add(makeBox(1.2, h, 0.8, matServerRack, 0, h / 2, 0));
+  // Front panel detail rows
+  for (let i = 0; i < Math.floor(h / 0.5); i++) {
+    const panelMat = new THREE.MeshStandardMaterial({
+      color: 0x1a1a22, metalness: 0.5, roughness: 0.4
+    });
+    group.add(makeBox(1.0, 0.35, 0.05, panelMat, 0, 0.3 + i * 0.45, 0.43));
+  }
+  // LED indicators (small emissive cubes)
+  const ledColors = [0x00ff44, 0x00ff44, 0xffaa00, 0x00ff44];
+  for (let i = 0; i < ledColors.length; i++) {
+    const ledMat = new THREE.MeshStandardMaterial({
+      color: ledColors[i], emissive: ledColors[i], emissiveIntensity: 1.0
+    });
+    const led = makeBox(0.06, 0.06, 0.06, ledMat, 0.4, 0.5 + i * 0.7, 0.44);
+    led.userData.isLED = true;
+    led.userData.baseColor = ledColors[i];
+    group.add(led);
+  }
+  return group;
+}
+
+function createDashboardPanel(w, h, textureW, textureH) {
+  const group = new THREE.Group();
+  // Frame
+  const frameMat = new THREE.MeshStandardMaterial({ color: 0x222230, metalness: 0.5 });
+  group.add(makeBox(w + 0.2, h + 0.2, 0.12, frameMat, 0, 0, 0));
+  // Screen with dashboard texture
+  const screenTex = createDashboardTexture(textureW || 512, textureH || 256);
+  const screenMat = new THREE.MeshStandardMaterial({
+    map: screenTex,
+    emissive: 0xffffff,
+    emissiveMap: screenTex,
+    emissiveIntensity: 0.5,
+  });
+  group.add(makeBox(w, h, 0.05, screenMat, 0, 0, 0.07));
+  // Screen glow
+  const glow = new THREE.PointLight(0x00aaff, 1, 5);
+  glow.position.set(0, 0, 0.5);
+  group.add(glow);
+  return group;
+}
+
+function createTree(trunkH, canopyR) {
+  const group = new THREE.Group();
+  const trunk = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.2, 0.3, trunkH, 8),
+    new THREE.MeshStandardMaterial({ color: 0x5a3a1a, roughness: 0.8 })
+  );
+  trunk.position.y = trunkH / 2;
+  trunk.castShadow = true;
+  group.add(trunk);
+  const canopy = new THREE.Mesh(
+    new THREE.SphereGeometry(canopyR, 12, 10),
+    new THREE.MeshStandardMaterial({ color: 0x2a6a2a, roughness: 0.8 })
+  );
+  canopy.position.y = trunkH + canopyR * 0.6;
+  canopy.castShadow = true;
+  group.add(canopy);
+  return group;
+}
+
+function createBush(r) {
+  const group = new THREE.Group();
+  const bushMat = new THREE.MeshStandardMaterial({ color: 0x3a7a3a, roughness: 0.8 });
+  const s1 = new THREE.Mesh(new THREE.SphereGeometry(r, 10, 8), bushMat);
+  s1.position.y = r * 0.7;
+  s1.castShadow = true;
+  group.add(s1);
+  const s2 = new THREE.Mesh(new THREE.SphereGeometry(r * 0.7, 10, 8), bushMat);
+  s2.position.set(r * 0.5, r * 0.5, r * 0.3);
+  group.add(s2);
+  return group;
+}
+
+function createStreetLight(height) {
+  const group = new THREE.Group();
+  const poleMat = new THREE.MeshStandardMaterial({ color: 0x555555, metalness: 0.6 });
+  // Pole
+  group.add(new THREE.Mesh(
+    new THREE.CylinderGeometry(0.12, 0.15, height, 8), poleMat
+  ).translateY(height / 2));
+  // Arm
+  const arm = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.06, 0.06, 2, 6), poleMat
+  );
+  arm.rotation.z = Math.PI / 2;
+  arm.position.set(1, height - 0.3, 0);
+  group.add(arm);
+  // Lamp housing
+  const lampMat = new THREE.MeshStandardMaterial({
+    color: 0xffffcc, emissive: 0xffdd88, emissiveIntensity: 0.6
+  });
+  const lamp = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.4, 0.3, 0.3, 8), lampMat
+  );
+  lamp.position.set(2, height - 0.5, 0);
+  group.add(lamp);
+  // Light
+  const light = new THREE.PointLight(0xffdd88, 1.5, 15);
+  light.position.set(2, height - 0.8, 0);
+  light.castShadow = false;
+  group.add(light);
+  return group;
+}
+
+// ==================== GROUND & STREET ====================
+// Grass ground
+const grassTex = createGrassTexture();
+const grassMat = new THREE.MeshStandardMaterial({ map: grassTex, roughness: 0.9 });
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(140, 140), grassMat);
+ground.rotation.x = -Math.PI / 2;
+ground.position.y = -0.05;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// Asphalt road (runs between hospital and home, along z-axis through center)
+const asphaltTex = createAsphaltTexture();
+const roadMat = new THREE.MeshStandardMaterial({ map: asphaltTex, roughness: 0.85 });
+const road = new THREE.Mesh(new THREE.PlaneGeometry(8, 50), roadMat);
+road.rotation.x = -Math.PI / 2;
+road.position.set(0, 0.02, 0);
+road.receiveShadow = true;
+scene.add(road);
+
+// Lane markings (dashed center line)
+const laneMat = new THREE.MeshStandardMaterial({ color: 0xdddd44, roughness: 0.5 });
+for (let z = -23; z <= 23; z += 3) {
+  const dash = makeBox(0.15, 0.02, 1.5, laneMat, 0, 0.04, z);
+  scene.add(dash);
+}
+
+// Sidewalks
+const sidewalkMat = new THREE.MeshStandardMaterial({ color: 0xaaaaaa, roughness: 0.7 });
+// Left sidewalk (hospital side)
+scene.add(makeBox(3, 0.15, 50, sidewalkMat, -5.5, 0.07, 0));
+// Right sidewalk (home side)
+scene.add(makeBox(3, 0.15, 50, sidewalkMat, 5.5, 0.07, 0));
+
+// Curbs
+const curbMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.6 });
+scene.add(makeBox(0.3, 0.2, 50, curbMat, -4, 0.1, 0));
+scene.add(makeBox(0.3, 0.2, 50, curbMat, 4, 0.1, 0));
+
+// Street lights
+const sl1 = createStreetLight(7);
+sl1.position.set(-4, 0, -8);
+scene.add(sl1);
+const sl2 = createStreetLight(7);
+sl2.position.set(4, 0, 5);
+sl2.rotation.y = Math.PI;
+scene.add(sl2);
+const sl3 = createStreetLight(7);
+sl3.position.set(-4, 0, 12);
+scene.add(sl3);
+
+// Trees
+const treePositions = [
+  [-6.5, 0, -15], [-6.5, 0, 8], [-6.5, 0, 18],
+  [6.5, 0, -12], [6.5, 0, 15]
+];
+treePositions.forEach(p => {
+  const t = createTree(3 + Math.random() * 2, 1.5 + Math.random() * 0.8);
+  t.position.set(p[0], p[1], p[2]);
+  scene.add(t);
+});
+
+// Bushes
+const bushPositions = [
+  [-6, 0, -5], [-6, 0, 3], [6, 0, -2], [6, 0, 9], [6, 0, -18]
+];
+bushPositions.forEach(p => {
+  const b = createBush(0.5 + Math.random() * 0.3);
+  b.position.set(p[0], p[1], p[2]);
+  scene.add(b);
+});
+
+// ==================== BUILD HOSPITAL (left side) ====================
+const hospital = new THREE.Group();
+hospital.position.set(-16, 0, 0);
+
+const HOSP_W = 20, HOSP_D = 15, FLOOR_H = 4;
+
+// Floors (3 floors)
+for (let i = 0; i < 3; i++) {
+  hospital.add(makeBox(HOSP_W, 0.3, HOSP_D, matFloor, 0, i * FLOOR_H, 0));
+}
+// Ceiling/roof slab
+hospital.add(makeBox(HOSP_W, 0.3, HOSP_D, matFloor, 0, 3 * FLOOR_H, 0));
+
+// Outer walls
+hospital.add(makeBox(HOSP_W, 12, 0.15, matWallHosp, 0, 6, HOSP_D / 2));
+hospital.add(makeBox(HOSP_W, 12, 0.15, matWallHosp, 0, 6, -HOSP_D / 2));
+hospital.add(makeBox(0.15, 12, HOSP_D, matWallHosp, -HOSP_W / 2, 6, 0));
+hospital.add(makeBox(0.15, 12, HOSP_D / 2, matWallHosp, HOSP_W / 2, 6, -HOSP_D / 4));
+
+// ---- FLOOR 1 (y=0 to y=4): Patient room, ICU, OR, nurse station, server room ----
+// Corridor walls (separating front rooms from back corridor)
+hospital.add(makeBox(HOSP_W, 3.7, 0.12, matWallSolid, 0, 2, 2.5));
+hospital.add(makeBox(HOSP_W, 3.7, 0.12, matWallSolid, 0, 2, -2.5));
+
+// Room dividers floor 1
+hospital.add(makeBox(0.12, 3.7, 5, matWallSolid, -4, 2, -5));  // between patient & ICU
+hospital.add(makeBox(0.12, 3.7, 5, matWallSolid, 4, 2, -5));   // between ICU & OR
+
+// Server room wall (back-right corner)
+hospital.add(makeBox(0.12, 3.7, 5, matWallSolid, 5, 2, 5));
+hospital.add(makeBox(5, 3.7, 0.12, matWallSolid, 7.5, 2, 2.5));
+
+// Patient Room (front-left, z < -2.5, x < -4)
+// Bed
+hospital.add(makeBox(1.2, 0.5, 2.5, matBed, -7, 0.55, -5));
+// IV pole
+const ivPole = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.04, 0.04, 2, 6),
+  matMetal
+);
+ivPole.position.set(-5.5, 1.2, -5);
+hospital.add(ivPole);
+const ivBag = makeBox(0.2, 0.4, 0.15, new THREE.MeshStandardMaterial({ color: 0xccddee, transparent: true, opacity: 0.6 }), -5.5, 2.3, -5);
+hospital.add(ivBag);
+// Monitor
+hospital.add(makeBox(0.8, 0.6, 0.15, new THREE.MeshStandardMaterial({ color: 0x111118, emissive: 0x003355, emissiveIntensity: 0.3 }), -8, 1.8, -6.5));
+
+// ICU Bay (front-center, z < -2.5, -4 < x < 4)
+hospital.add(makeBox(1.2, 0.5, 2.5, matBed, -1, 0.55, -5));
+// Ventilator
+hospital.add(makeBox(0.6, 1.4, 0.6, matMetal, 1, 1, -5.5));
+// Curtain dividers (thin semi-transparent)
+const curtainMat = new THREE.MeshStandardMaterial({ color: 0xccddcc, transparent: true, opacity: 0.3 });
+hospital.add(makeBox(0.05, 2.5, 3, curtainMat, -2.5, 1.6, -5));
+hospital.add(makeBox(0.05, 2.5, 3, curtainMat, 2.5, 1.6, -5));
+
+// Operating Room (front-right, z < -2.5, x > 4)
+const orTable = makeBox(2, 0.4, 3, new THREE.MeshStandardMaterial({ color: 0xb0c0d0, metalness: 0.3 }), 7, 0.5, -5);
+hospital.add(orTable);
+// Overhead OR light
+const orLightGeo = new THREE.CylinderGeometry(0.8, 0.8, 0.15, 16);
+const orLight = new THREE.Mesh(orLightGeo, new THREE.MeshStandardMaterial({ color: 0xffffee, emissive: 0xffffaa, emissiveIntensity: 0.5 }));
+orLight.position.set(7, 3.5, -5);
+hospital.add(orLight);
+// Instrument tray
+hospital.add(makeBox(1.5, 0.05, 0.6, matMetal, 8.5, 1.2, -4));
+// Tray stand leg
+hospital.add(new THREE.Mesh(
+  new THREE.CylinderGeometry(0.05, 0.08, 1.2, 6), matMetal
+).translateX(8.5).translateY(0.6).translateZ(-4));
+
+// Nurse station (corridor, z between -2.5 and 2.5)
+hospital.add(makeBox(3, 1, 1.2, matFurniture, -7, 0.65, 0));
+hospital.add(makeBox(1.5, 0.6, 0.1, new THREE.MeshStandardMaterial({ color: 0x111118, emissive: 0x003355, emissiveIntensity: 0.3 }), -7, 1.5, -0.5));
+
+// Server/Data Room (back-right corner, z > 2.5, x > 5)
+// Server racks
+const rack1 = createServerRack(3.2);
+rack1.position.set(7, 0.15, 5);
+hospital.add(rack1);
+const rack2 = createServerRack(3.2);
+rack2.position.set(8.5, 0.15, 5);
+hospital.add(rack2);
+const rack3 = createServerRack(3.2);
+rack3.position.set(7, 0.15, 6.2);
+rack3.rotation.y = Math.PI;
+hospital.add(rack3);
+const rack4 = createServerRack(2.8);
+rack4.position.set(8.5, 0.15, 6.2);
+rack4.rotation.y = Math.PI;
+hospital.add(rack4);
+
+// Large dashboard panel (wall-mounted)
+const hospDashboard = createDashboardPanel(4, 2, 512, 256);
+hospDashboard.position.set(9.8, 2.2, 5.5);
+hospDashboard.rotation.y = -Math.PI / 2;
+hospital.add(hospDashboard);
+
+// Cable trays on ceiling (thin boxes across ceiling)
+const cableMat = new THREE.MeshStandardMaterial({ color: 0x444448, metalness: 0.4 });
+hospital.add(makeBox(5, 0.1, 0.3, cableMat, 7.5, 3.7, 4.5));
+hospital.add(makeBox(0.3, 0.1, 3, cableMat, 7.5, 3.7, 5.5));
+
+// HVAC unit
+hospital.add(makeBox(3, 2, 2, new THREE.MeshStandardMaterial({ color: 0x8899aa, metalness: 0.4 }), -7, 1.3, 5));
+
+// ---- FLOOR 2 (y=4 to y=8): Patient rooms, lab, staff break room ----
+// Room dividers floor 2
+hospital.add(makeBox(0.12, 3.7, HOSP_D, matWallSolid, -4, 6, 0));
+hospital.add(makeBox(0.12, 3.7, HOSP_D, matWallSolid, 4, 6, 0));
+// Corridor
+hospital.add(makeBox(HOSP_W, 3.7, 0.12, matWallSolid, 0, 6, 0));
+
+// Patient rooms floor 2 (left wing)
+hospital.add(makeBox(1.2, 0.5, 2.5, matBed, -7, 4.55, -4));
+hospital.add(makeBox(1.2, 0.5, 2.5, matBed, -7, 4.55, 4));
+// Bedside tables
+hospital.add(makeBox(0.5, 0.5, 0.5, matFurniture, -5.8, 4.55, -3));
+hospital.add(makeBox(0.5, 0.5, 0.5, matFurniture, -5.8, 4.55, 4.5));
+
+// Lab/Diagnostics room (center wing, z > 0)
+hospital.add(makeBox(3, 0.9, 1, matCounter, 0, 4.75, 4));
+// Microscope silhouette
+const microscopeGroup = new THREE.Group();
+microscopeGroup.add(makeBox(0.3, 0.8, 0.3, matDarkMetal, 0, 0.4, 0));
+microscopeGroup.add(makeBox(0.15, 0.5, 0.1, matDarkMetal, 0, 0.8, 0.15));
+microscopeGroup.add(new THREE.Mesh(
+  new THREE.CylinderGeometry(0.08, 0.06, 0.4, 8), matDarkMetal
+).translateY(1.1));
+microscopeGroup.position.set(0, 5.2, 4);
+hospital.add(microscopeGroup);
+
+// Staff break room (right wing, z > 0)
+// Table
+hospital.add(makeBox(2, 0.08, 1.2, matFurniture, 7, 4.7, 4));
+// Table legs
+[[-0.8, -0.5], [-0.8, 0.5], [0.8, -0.5], [0.8, 0.5]].forEach(([lx, lz]) => {
+  hospital.add(makeBox(0.1, 0.4, 0.1, matFurniture, 7 + lx, 4.5, 4 + lz));
+});
+// Chairs
+[6, 8].forEach(cx => {
+  hospital.add(makeBox(0.6, 0.08, 0.6, matFurniture, cx, 4.5, 3));
+  hospital.add(makeBox(0.6, 0.7, 0.08, matFurniture, cx, 4.85, 2.72));
+});
+
+// ---- FLOOR 3 (y=8 to y=12): Admin — desks, conference table ----
+// Divider
+hospital.add(makeBox(0.12, 3.7, HOSP_D, matWallSolid, 0, 10, 0));
+
+// Desks (left)
+for (let i = 0; i < 3; i++) {
+  hospital.add(makeBox(2, 0.8, 1, matFurniture, -6 + i * 3, 8.7, -4));
+  // Office chairs
+  hospital.add(makeBox(0.6, 0.08, 0.6, matDarkMetal, -6 + i * 3, 8.55, -2.5));
+}
+
+// Conference table (right)
+hospital.add(makeBox(4, 0.1, 2.5, matFurniture, 5, 8.7, 0));
+// Conference chairs
+[-1.5, -0.5, 0.5, 1.5].forEach(zo => {
+  hospital.add(makeBox(0.5, 0.08, 0.5, matDarkMetal, 3, 8.55, zo));
+  hospital.add(makeBox(0.5, 0.08, 0.5, matDarkMetal, 7, 8.55, zo));
+});
+
+// MRSA hotspot
+const mrsaGeo = new THREE.SphereGeometry(0.4, 16, 16);
+const mrsa = new THREE.Mesh(mrsaGeo, matAlert);
+mrsa.position.set(-5, 1.5, 2.5);
+hospital.add(mrsa);
+const mrsaLight = new THREE.PointLight(0xff4444, 2, 5);
+mrsaLight.position.copy(mrsa.position);
+hospital.add(mrsaLight);
+
+// Hospital Local AI Hub (on wall above nurse station)
+const hospHub = createAIHub(true);
+hospHub.position.set(0, 7, HOSP_D / 2 - 0.2);
+hospital.add(hospHub);
+
+// Hospital sign
+const signMat = new THREE.MeshStandardMaterial({ color: 0xcc3333, emissive: 0x991111, emissiveIntensity: 0.3 });
+hospital.add(makeBox(6, 1.2, 0.15, signMat, 0, 12.8, HOSP_D / 2 + 0.1));
+// Cross
+const crossMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+hospital.add(makeBox(0.15, 0.8, 0.18, crossMat, -2, 12.8, HOSP_D / 2 + 0.2));
+hospital.add(makeBox(0.5, 0.15, 0.18, crossMat, -2, 12.8, HOSP_D / 2 + 0.2));
+
+scene.add(hospital);
+
+// ==================== BUILD HOME (right side) ====================
+const home = new THREE.Group();
+home.position.set(16, 0, 0);
+
+const HOME_W = 14, HOME_D = 11;
+
+// Basement
+const basementBox = makeBox(HOME_W, 3, HOME_D, matBasement, 0, -1.35, 0);
+home.add(basementBox);
+home.add(makeBox(HOME_W, 0.2, HOME_D, new THREE.MeshStandardMaterial({ color: 0x2a2a30 }), 0, -2.8, 0));
+
+// First floor slab
+home.add(makeBox(HOME_W, 0.3, HOME_D, matFloor, 0, 0.15, 0));
+
+// First floor walls
+home.add(makeBox(HOME_W, 5, 0.15, matWallHome, 0, 2.8, HOME_D / 2));
+home.add(makeBox(HOME_W, 5, 0.15, matWallHome, 0, 2.8, -HOME_D / 2));
+home.add(makeBox(0.15, 5, HOME_D, matWallHome, -HOME_W / 2, 2.8, 0));
+home.add(makeBox(0.15, 5, HOME_D / 2, matWallHome, HOME_W / 2, 2.8, -HOME_D / 4));
+
+// Internal walls - first floor
+// Separate kitchen (right) from living (left)
+home.add(makeBox(0.12, 5, HOME_D * 0.55, matWallSolid, -1, 2.8, -1.2));
+// Bathroom wall (back-left corner)
+home.add(makeBox(3, 5, 0.12, matWallSolid, -5.5, 2.8, -2));
+home.add(makeBox(0.12, 5, 3, matWallSolid, -4, 2.8, -3.8));
+
+// Door
+home.add(makeBox(1.5, 2.5, 0.2, matDoor, 0, 1.55, HOME_D / 2 + 0.1));
+
+// Windows
+[[-5, 3, HOME_D / 2 + 0.1], [3, 3, HOME_D / 2 + 0.1], [-5, 3, -HOME_D / 2 - 0.1], [5, 3, -HOME_D / 2 - 0.1]].forEach(pos => {
+  home.add(makeBox(1.8, 1.5, 0.1, matGlass, pos[0], pos[1], pos[2]));
+});
+
+// ---- LIVING ROOM (first floor, left of center wall) ----
+// Couch
+home.add(makeBox(3, 0.5, 1.2, matCushion, -4.5, 0.55, 2));
+// Couch back
+home.add(makeBox(3, 0.6, 0.2, matCushion, -4.5, 0.85, 2.7));
+// TV stand
+home.add(makeBox(2, 0.5, 0.5, matFurniture, -4.5, 0.55, -0.5));
+// TV (thin black panel)
+home.add(makeBox(1.8, 1.2, 0.08, new THREE.MeshStandardMaterial({ color: 0x111118, emissive: 0x002244, emissiveIntensity: 0.2 }), -4.5, 1.5, -0.5));
+// Bookshelf
+home.add(makeBox(1.2, 2.5, 0.5, matFurniture, -6.5, 1.55, 0));
+// Shelf partitions
+for (let i = 0; i < 4; i++) {
+  home.add(makeBox(1.2, 0.05, 0.5, matFurniture, -6.5, 0.5 + i * 0.6, 0));
+}
+// Books (small colored blocks on shelves)
+const bookColors = [0xcc3333, 0x3333cc, 0x33aa33, 0xaaaa33, 0x8833aa];
+bookColors.forEach((c, i) => {
+  home.add(makeBox(0.15, 0.4, 0.35, new THREE.MeshStandardMaterial({ color: c }), -6.8 + i * 0.25, 0.5 + Math.floor(i / 3) * 0.6, 0));
+});
+
+// ---- KITCHEN (first floor, right of center wall) ----
+// Counter L-shaped
+home.add(makeBox(4, 0.9, 0.8, matCounter, 4, 0.75, -3.5));
+home.add(makeBox(0.8, 0.9, 3, matCounter, 6.2, 0.75, -2));
+// Fridge (tall white box)
+home.add(makeBox(1, 2.2, 0.8, matAppliance, 5, 1.4, 3.5));
+// Stove
+home.add(makeBox(1, 0.9, 0.8, matAppliance, 2, 0.75, -3.5));
+// Stove burners (small dark circles)
+[[-0.3, 0], [0.3, 0]].forEach(([bx, bz]) => {
+  home.add(makeBox(0.3, 0.02, 0.3, matDarkMetal, 2 + bx, 1.22, -3.5 + bz));
+});
+
+// ---- BATHROOM (back-left corner, x < -4, z < -2) ----
+// Sink (small counter + basin)
+home.add(makeBox(0.8, 0.8, 0.5, matAppliance, -5.5, 0.7, -3.5));
+// Mirror
+home.add(makeBox(0.6, 0.8, 0.05, matGlass, -5.5, 1.6, -5.2));
+
+// ---- BASEMENT ----
+// Basement internal wall (separating main area from smart-hub corner)
+home.add(makeBox(0.12, 2.5, 4, new THREE.MeshStandardMaterial({ color: 0x555560, transparent: true, opacity: 0.4 }), 3, -1.55, -3.5));
+
+// Water heater (cylinder)
+const waterHeater = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.5, 0.5, 1.8, 12),
+  matAppliance
+);
+waterHeater.position.set(-5, -1.7, -3);
+home.add(waterHeater);
+
+// Washer & Dryer (two boxes side by side)
+home.add(makeBox(1, 1.2, 1, matAppliance, -3, -2, 3));
+home.add(makeBox(1, 1.2, 1, matAppliance, -1.8, -2, 3));
+
+// Shelving with items
+home.add(makeBox(2, 2, 0.4, matFurniture, -5, -1.6, 3));
+// Shelf items
+home.add(makeBox(0.3, 0.3, 0.3, new THREE.MeshStandardMaterial({ color: 0xaa4444 }), -5.3, -0.8, 3.1));
+home.add(makeBox(0.4, 0.25, 0.3, new THREE.MeshStandardMaterial({ color: 0x4444aa }), -4.7, -0.8, 3.1));
+home.add(makeBox(0.25, 0.35, 0.25, new THREE.MeshStandardMaterial({ color: 0x44aa44 }), -5, -1.4, 3.1));
+
+// Mold colony
+const moldGroup = new THREE.Group();
+[[0, 0, 0, 0.35], [0.4, 0.2, 0.1, 0.25], [-0.3, -0.2, 0.15, 0.3],
+ [0.5, -0.1, -0.1, 0.2], [-0.2, 0.3, -0.05, 0.18]].forEach(p => {
+  moldGroup.add(new THREE.Mesh(new THREE.SphereGeometry(p[3], 12, 12), matMold).translateX(p[0]).translateY(p[1]).translateZ(p[2]));
+});
+moldGroup.position.set(5, -2.2, 3);
+home.add(moldGroup);
+
+// Mold alert light
+const moldAlert = new THREE.PointLight(0xff4444, 1.5, 4);
+moldAlert.position.set(5, -1.5, 3);
+home.add(moldAlert);
+
+// Charging dock
+home.add(makeBox(1.2, 0.3, 0.8, new THREE.MeshStandardMaterial({ color: 0x333338, metalness: 0.5 }), -3, -2.65, -2));
+const dockLight = new THREE.PointLight(0x44ff44, 0.5, 2);
+dockLight.position.set(-3, -2.3, -2);
+home.add(dockLight);
+
+// ---- SMART-HUB / SERVER CLOSET (basement, right corner x > 3, z < -1.5) ----
+// Small server rack
+const homeRack = createServerRack(2.2);
+homeRack.position.set(5, -2.65, -3);
+home.add(homeRack);
+
+// Wall-mounted dashboard panel (smaller)
+const homeDashboard = createDashboardPanel(2.5, 1.5, 320, 192);
+homeDashboard.position.set(6.8, -1.2, -3.5);
+homeDashboard.rotation.y = -Math.PI / 2;
+home.add(homeDashboard);
+
+// Router box with LED
+home.add(makeBox(0.5, 0.3, 0.4, matDarkMetal, 4, -2.5, -4.5));
+const routerLed = makeBox(0.06, 0.06, 0.06,
+  new THREE.MeshStandardMaterial({ color: 0x00ff44, emissive: 0x00ff44, emissiveIntensity: 1 }),
+  4.15, -2.4, -4.5);
+routerLed.userData.isLED = true;
+routerLed.userData.baseColor = 0x00ff44;
+home.add(routerLed);
+
+// Roof
+const roofGeo = new THREE.ConeGeometry(11, 4, 4);
+const roof = new THREE.Mesh(roofGeo, matRoof);
+roof.position.set(0, 7.3, 0);
+roof.rotation.y = Math.PI / 4;
+roof.castShadow = true;
+home.add(roof);
+
+// Home Local AI Hub (living room wall, first floor)
+const homeHub = createAIHub(true);
+homeHub.position.set(-5, 3.5, HOME_D / 2 - 0.2);
+home.add(homeHub);
+
+scene.add(home);
+
+// ==================== CENTRAL AI HUB (floating above) ====================
+const centralHub = createAIHub(false);
+centralHub.position.set(0, 22, 0);
+scene.add(centralHub);
+
+// Rotating rings
+const ringGeo = new THREE.TorusGeometry(2.5, 0.06, 8, 48);
+const ringMat = new THREE.MeshStandardMaterial({ color: 0x00ddff, emissive: 0x0088aa, emissiveIntensity: 0.5 });
+const ring1 = new THREE.Mesh(ringGeo, ringMat);
+ring1.position.set(0, 22, 0);
+scene.add(ring1);
+const ring2 = ring1.clone();
+ring2.rotation.x = Math.PI / 3;
+scene.add(ring2);
+const ring3 = ring1.clone();
+ring3.rotation.x = -Math.PI / 3;
+scene.add(ring3);
+
+// ==================== ROBOTS (10 total) ====================
+const robots = [];
+
+// --- Hospital robots (6) ---
+// 0: Sensor Bot A — corridor patrol
+const hospBot1 = createRobot(matRobotEyeBlue, 'Sensor Bot A',
+  'Patrolling Floor 1 corridor. 16S rRNA sampler active. Scanning for MRSA near patient rooms.');
+scene.add(hospBot1);
+robots.push({ mesh: hospBot1, path: 'hospCorridor', t: 0, speed: 0.15 });
+
+// 1: Sterilize Bot — ICU
+const hospBot2 = createRobot(matRobotEyeGreen, 'Sterilize Bot',
+  'UV-C sterilization active in ICU Bay. Targeting high-touch surfaces. Probiotic spray armed.');
+scene.add(hospBot2);
+robots.push({ mesh: hospBot2, path: 'hospICU', t: 0, speed: 0.1 });
+
+// 2: Air Monitor — near HVAC
+const hospBot3 = createRobot(matRobotEyeOrange, 'Air Monitor',
+  'Sampling airborne particulates near HVAC intake. VOC array detecting elevated fungal metabolites.');
+scene.add(hospBot3);
+robots.push({ mesh: hospBot3, path: 'hospHVAC', t: 0, speed: 0.12 });
+
+// 3: P-trap MicroBot — tiny, near sink drain floor 1
+const hospBot4 = createRobot(matRobotEyePink, 'P-trap MicroBot',
+  'Sub-centimeter scale. Monitoring sink p-trap biofilm. Detecting carbapenem-resistant organisms in plumbing.', 0.5);
+scene.add(hospBot4);
+robots.push({ mesh: hospBot4, path: 'hospPtrap', t: 0, speed: 0.08 });
+
+// 4: Supply Bot — floor 2 patrol
+const hospBot5 = createRobot(matRobotEyeCyan, 'Supply Bot',
+  'Floor 2 logistics patrol. Delivering sterile supplies. Air sampling en route. Surface culture pending.');
+scene.add(hospBot5);
+robots.push({ mesh: hospBot5, path: 'hospFloor2', t: 0, speed: 0.13 });
+
+// 5: Data Room Sentry — near server room
+const hospBot6 = createRobot(matRobotEyeYellow, 'Data Room Sentry',
+  'Monitoring server room environment. Temperature: 18.2°C. Humidity: 42%. Dust particulate count nominal.');
+scene.add(hospBot6);
+robots.push({ mesh: hospBot6, path: 'hospServerRoom', t: 0, speed: 0.06 });
+
+// --- Home robots (4) ---
+// 6: Basement MicroGuard
+const homeBot1 = createRobot(matRobotEyeBlue, 'Basement MicroGuard',
+  'Basement patrol. Mold colony detected! Deploying probiotic countermeasure spray via articulated arm.');
+scene.add(homeBot1);
+robots.push({ mesh: homeBot1, path: 'homeBasement', t: 0, speed: 0.08 });
+
+// 7: First Floor Patrol
+const homeBot2 = createRobot(matRobotEyeGreen, 'First Floor Patrol',
+  'First floor sweep. Surface sampling living room and kitchen areas. All readings nominal.');
+scene.add(homeBot2);
+robots.push({ mesh: homeBot2, path: 'homeFirstFloor', t: 0, speed: 0.14 });
+
+// 8: Kitchen Air Sampler
+const homeBot3 = createRobot(matRobotEyeOrange, 'Kitchen Air Sampler',
+  'Monitoring kitchen air quality. VOC levels normal. Checking food storage areas for spoilage indicators.');
+scene.add(homeBot3);
+robots.push({ mesh: homeBot3, path: 'homeKitchen', t: 0, speed: 0.1 });
+
+// 9: Attic/HVAC Monitor
+const homeBot4 = createRobot(matRobotEyeCyan, 'HVAC/Roof Monitor',
+  'Monitoring attic ventilation and HVAC ducting. Checking for condensation and mold precursors near roofline.');
+scene.add(homeBot4);
+robots.push({ mesh: homeBot4, path: 'homeRoof', t: 0, speed: 0.07 });
+
+// ==================== ROBOT PATH DEFINITIONS ====================
+const HX = -16; // hospital group x offset
+const HMX = 16; // home group x offset
+
+function getRobotPosition(pathName, t) {
+  const tt = t % 1;
+  const a = tt * Math.PI * 2;
+  switch (pathName) {
+    case 'hospCorridor': {
+      const x = HX + Math.sin(a) * 8;
+      const z = 0;
+      return { x, y: 0.3, z, rotY: Math.cos(a) > 0 ? 0 : Math.PI };
+    }
+    case 'hospICU': {
+      const x = HX + Math.sin(a) * 2;
+      const z = -5 + Math.cos(a) * 1.5;
+      return { x, y: 0.3, z, rotY: Math.atan2(Math.cos(a), Math.sin(a)) };
+    }
+    case 'hospHVAC': {
+      const x = HX - 7 + Math.cos(a) * 1.5;
+      const z = 5 + Math.sin(a) * 1.5;
+      return { x, y: 0.3, z, rotY: Math.atan2(Math.cos(a), -Math.sin(a)) };
+    }
+    case 'hospPtrap': {
+      // Tiny bot near patient room sink on floor 1 — small orbit near x=-7, z=-6
+      const x = HX - 7 + Math.sin(a) * 0.8;
+      const z = -6.5 + Math.cos(a) * 0.5;
+      return { x, y: 0.15, z, rotY: a };
+    }
+    case 'hospFloor2': {
+      // Floor 2 patrol — wider path
+      const x = HX + Math.sin(a) * 7;
+      const z = Math.cos(a) * 3;
+      return { x, y: 4.3, z, rotY: Math.atan2(Math.cos(a) * 3, Math.sin(a) * 7) };
+    }
+    case 'hospServerRoom': {
+      // Small patrol in server room area
+      const x = HX + 7.5 + Math.sin(a) * 1;
+      const z = 5.5 + Math.cos(a) * 0.8;
+      return { x, y: 0.3, z, rotY: a + Math.PI };
+    }
+    case 'homeBasement': {
+      const x = HMX + 2 + Math.sin(a) * 3.5;
+      const z = 1 + Math.cos(a) * 2;
+      return { x, y: -2.5, z, rotY: Math.atan2(-Math.sin(a) * 2, Math.cos(a) * 3.5) };
+    }
+    case 'homeFirstFloor': {
+      const x = HMX + Math.sin(a) * 4;
+      const z = Math.cos(a) * 3;
+      return { x, y: 0.4, z, rotY: Math.atan2(Math.cos(a) * 3, Math.sin(a) * 4) };
+    }
+    case 'homeKitchen': {
+      // Kitchen area patrol (right side of home)
+      const x = HMX + 4 + Math.sin(a) * 1.5;
+      const z = -1 + Math.cos(a) * 2;
+      return { x, y: 0.4, z, rotY: Math.atan2(-Math.sin(a) * 2, Math.cos(a) * 1.5) };
+    }
+    case 'homeRoof': {
+      // Near roof/attic, orbiting at top of home
+      const x = HMX + Math.sin(a) * 3;
+      const z = Math.cos(a) * 2.5;
+      return { x, y: 6, z, rotY: a };
+    }
+    default:
+      return { x: 0, y: 0, z: 0, rotY: 0 };
+  }
+}
+
+// ==================== DATA PARTICLES ====================
+const particleCount = 180;
+const particleGeo = new THREE.BufferGeometry();
+const particlePositions = new Float32Array(particleCount * 3);
+const particleColors = new Float32Array(particleCount * 3);
+const particleSizes = new Float32Array(particleCount);
+const particleData = [];
+
+// Hospital hub position (world coords)
+const hospHubWorld = new THREE.Vector3(HX, 7, HOSP_D / 2 - 0.2);
+// Home hub position (world coords)
+const homeHubWorld = new THREE.Vector3(HMX - 5, 3.5, HOME_D / 2 - 0.2);
+
+const commPaths = [
+  // Hospital bots (0-5) → hospital hub
+  { fromKey: 0, toPos: hospHubWorld, color: new THREE.Color(0x0099ff) },
+  { fromKey: 1, toPos: hospHubWorld, color: new THREE.Color(0x33dd66) },
+  { fromKey: 2, toPos: hospHubWorld, color: new THREE.Color(0xff9922) },
+  { fromKey: 3, toPos: hospHubWorld, color: new THREE.Color(0xff66aa) },
+  { fromKey: 4, toPos: hospHubWorld, color: new THREE.Color(0x66ccff) },
+  { fromKey: 5, toPos: hospHubWorld, color: new THREE.Color(0xffcc33) },
+  // Home bots (6-9) → home hub
+  { fromKey: 6, toPos: homeHubWorld, color: new THREE.Color(0x0099ff) },
+  { fromKey: 7, toPos: homeHubWorld, color: new THREE.Color(0x33dd66) },
+  { fromKey: 8, toPos: homeHubWorld, color: new THREE.Color(0xff9922) },
+  { fromKey: 9, toPos: homeHubWorld, color: new THREE.Color(0x66ccff) },
+  // Local hubs → central
+  { fromPos: hospHubWorld, toPos: new THREE.Vector3(0, 22, 0), color: new THREE.Color(0x00ddff) },
+  { fromPos: homeHubWorld, toPos: new THREE.Vector3(0, 22, 0), color: new THREE.Color(0x00ddff) },
+];
+
+for (let i = 0; i < particleCount; i++) {
+  const pathIdx = i % commPaths.length;
+  const path = commPaths[pathIdx];
+  particleData.push({
+    pathIdx,
+    t: Math.random(),
+    speed: 0.2 + Math.random() * 0.3,
+  });
+  particleColors[i * 3] = path.color.r;
+  particleColors[i * 3 + 1] = path.color.g;
+  particleColors[i * 3 + 2] = path.color.b;
+  particleSizes[i] = 2 + Math.random() * 2;
+}
+
+particleGeo.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
+particleGeo.setAttribute('color', new THREE.BufferAttribute(particleColors, 3));
+particleGeo.setAttribute('size', new THREE.BufferAttribute(particleSizes, 1));
+
+const particleTexture = new THREE.CanvasTexture((() => {
+  const c = document.createElement('canvas');
+  c.width = 32; c.height = 32;
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+  g.addColorStop(0, 'rgba(255,255,255,1)');
+  g.addColorStop(0.3, 'rgba(255,255,255,0.6)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 32, 32);
+  return c;
+})());
+
+const particleMat = new THREE.PointsMaterial({
+  size: 0.3,
+  map: particleTexture,
+  vertexColors: true,
+  transparent: true,
+  opacity: 0.8,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+  sizeAttenuation: true,
+});
+const particles = new THREE.Points(particleGeo, particleMat);
+scene.add(particles);
+
+// ==================== SPRAY PARTICLES ====================
+const sprayCount = 40;
+const sprayGeo = new THREE.BufferGeometry();
+const sprayPositions = new Float32Array(sprayCount * 3);
+const sprayData = [];
+for (let i = 0; i < sprayCount; i++) {
+  sprayData.push({ t: Math.random(), speed: 0.4 + Math.random() * 0.3 });
+}
+sprayGeo.setAttribute('position', new THREE.BufferAttribute(sprayPositions, 3));
+const sprayMat = new THREE.PointsMaterial({
+  size: 0.15,
+  color: 0x33ff66,
+  transparent: true,
+  opacity: 0.7,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+  sizeAttenuation: true,
+});
+const sprayParticles = new THREE.Points(sprayGeo, sprayMat);
+scene.add(sprayParticles);
+
+// ==================== RAYCASTING (hover tooltips) ====================
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2(-999, -999);
+const tooltip = document.getElementById('tooltip');
+
+renderer.domElement.addEventListener('mousemove', (e) => {
+  mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+  raycaster.setFromCamera(mouse, camera);
+  let found = false;
+  for (const r of robots) {
+    const intersects = raycaster.intersectObjects(r.mesh.children, true);
+    if (intersects.length > 0) {
+      tooltip.style.display = 'block';
+      tooltip.style.left = (e.clientX + 15) + 'px';
+      tooltip.style.top = (e.clientY - 10) + 'px';
+      tooltip.querySelector('.tt-title').textContent = r.mesh.userData.label;
+      tooltip.querySelector('.tt-body').textContent = r.mesh.userData.tooltip;
+      found = true;
+      document.body.style.cursor = 'pointer';
+      break;
+    }
+  }
+  if (!found) {
+    tooltip.style.display = 'none';
+    document.body.style.cursor = 'default';
+  }
+});
+
+// ==================== COLLECT LEDs FOR BLINKING ====================
+const ledMeshes = [];
+function collectLEDs(obj) {
+  if (obj.userData && obj.userData.isLED) ledMeshes.push(obj);
+  if (obj.children) obj.children.forEach(c => collectLEDs(c));
+}
+collectLEDs(scene);
+
+// ==================== SCENE LABELS (3D → 2D projection) ====================
+const sceneLabels = [
+  { el: document.getElementById('labelHospital'), worldPos: new THREE.Vector3(-16, 14.5, 0) },
+  { el: document.getElementById('labelHome'),     worldPos: new THREE.Vector3(16, 10, 0) },
+  { el: document.getElementById('labelHub'),      worldPos: new THREE.Vector3(0, 24, 0) },
+];
+
+function updateSceneLabels() {
+  const halfW = window.innerWidth / 2;
+  const halfH = window.innerHeight / 2;
+  for (const lbl of sceneLabels) {
+    const v = lbl.worldPos.clone().project(camera);
+    // Hide if behind camera
+    if (v.z > 1) { lbl.el.style.display = 'none'; continue; }
+    lbl.el.style.display = 'block';
+    lbl.el.style.left = (v.x * halfW + halfW - lbl.el.offsetWidth / 2) + 'px';
+    lbl.el.style.top  = (-v.y * halfH + halfH - lbl.el.offsetHeight / 2) + 'px';
+  }
+}
+
+// ==================== ANIMATION LOOP ====================
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = clock.getDelta();
+  const time = clock.getElapsedTime();
+
+  // Update robot positions
+  robots.forEach(r => {
+    r.t += dt * r.speed;
+    const pos = getRobotPosition(r.path, r.t);
+    r.mesh.position.set(pos.x, pos.y, pos.z);
+    r.mesh.rotation.y = pos.rotY;
+  });
+
+  // Update communication particles
+  const positions = particles.geometry.attributes.position.array;
+  for (let i = 0; i < particleCount; i++) {
+    const pd = particleData[i];
+    const path = commPaths[pd.pathIdx];
+    pd.t += dt * pd.speed;
+    if (pd.t > 1) pd.t -= 1;
+
+    let fromPos;
+    if (path.fromKey !== undefined) {
+      fromPos = robots[path.fromKey].mesh.position.clone();
+      fromPos.y += 1.5;
+    } else {
+      fromPos = path.fromPos;
+    }
+    const toPos = path.toPos;
+
+    const t = pd.t;
+    const mid = fromPos.clone().lerp(toPos, 0.5);
+    mid.y += 3;
+
+    const oneMinusT = 1 - t;
+    positions[i * 3]     = oneMinusT * oneMinusT * fromPos.x + 2 * oneMinusT * t * mid.x + t * t * toPos.x + (Math.random() - 0.5) * 0.1;
+    positions[i * 3 + 1] = oneMinusT * oneMinusT * fromPos.y + 2 * oneMinusT * t * mid.y + t * t * toPos.y + (Math.random() - 0.5) * 0.1;
+    positions[i * 3 + 2] = oneMinusT * oneMinusT * fromPos.z + 2 * oneMinusT * t * mid.z + t * t * toPos.z + (Math.random() - 0.5) * 0.1;
+  }
+  particles.geometry.attributes.position.needsUpdate = true;
+
+  // Update spray particles
+  const sp = sprayParticles.geometry.attributes.position.array;
+  const botPos = robots[6].mesh.position; // homeBot1 (basement MicroGuard)
+  const moldPos = new THREE.Vector3(HMX + 5, -2.2, 3);
+  for (let i = 0; i < sprayCount; i++) {
+    const sd = sprayData[i];
+    sd.t += dt * sd.speed;
+    if (sd.t > 1) sd.t -= 1;
+    const t = sd.t;
+    sp[i * 3]     = botPos.x + (moldPos.x - botPos.x) * t + (Math.random() - 0.5) * 0.3 * t;
+    sp[i * 3 + 1] = botPos.y + 1 + (moldPos.y - botPos.y - 1) * t + Math.sin(t * Math.PI) * 0.8;
+    sp[i * 3 + 2] = botPos.z + (moldPos.z - botPos.z) * t + (Math.random() - 0.5) * 0.3 * t;
+  }
+  sprayParticles.geometry.attributes.position.needsUpdate = true;
+
+  // Rotate hub rings
+  ring1.rotation.y = time * 0.3;
+  ring2.rotation.y = -time * 0.2;
+  ring2.rotation.x = Math.PI / 3 + Math.sin(time * 0.1) * 0.1;
+  ring3.rotation.y = time * 0.25;
+  ring3.rotation.x = -Math.PI / 3 + Math.cos(time * 0.1) * 0.1;
+
+  // Pulse alerts
+  mrsaLight.intensity = 1.5 + Math.sin(time * 4) * 1;
+  moldAlert.intensity = 1 + Math.sin(time * 3) * 0.8;
+  hubGlow1.intensity = 2 + Math.sin(time * 2) * 0.5;
+
+  // Blink LEDs
+  ledMeshes.forEach((led, idx) => {
+    const blink = Math.sin(time * (3 + idx * 1.7)) > 0;
+    led.material.emissiveIntensity = blink ? 1.0 : 0.15;
+  });
+
+  controls.update();
+  updateSceneLabels();
+  renderer.render(scene, camera);
+}
+
+animate();
+
+// ==================== RESIZE ====================
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+</script>
+</body>
+</html>
