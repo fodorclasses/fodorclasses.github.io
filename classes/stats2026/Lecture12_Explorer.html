@@ -1,0 +1,1279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lecture 12 Explorer — Statistical Tests Playground</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --card: #16213e;
+    --accent: #0f3460;
+    --highlight: #e94560;
+    --text: #eee;
+    --muted: #aab;
+    --success: #2ecc71;
+    --warn: #f39c12;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+  }
+  header {
+    background: linear-gradient(135deg, var(--accent), var(--card));
+    padding: 2rem;
+    text-align: center;
+    border-bottom: 3px solid var(--highlight);
+  }
+  header h1 { font-size: 2rem; margin-bottom: 0.3rem; }
+  header p { color: var(--muted); font-size: 1rem; }
+  nav {
+    display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem;
+    padding: 1rem; background: var(--card);
+    position: sticky; top: 0; z-index: 100;
+    border-bottom: 1px solid #333;
+  }
+  nav button {
+    background: var(--accent); color: var(--text); border: none;
+    padding: 0.5rem 1.2rem; border-radius: 20px; cursor: pointer;
+    font-size: 0.9rem; transition: all 0.2s;
+  }
+  nav button:hover, nav button.active {
+    background: var(--highlight); transform: scale(1.05);
+  }
+  .section {
+    display: none; max-width: 1000px; margin: 2rem auto; padding: 0 1rem;
+  }
+  .section.active { display: block; }
+  .card {
+    background: var(--card); border-radius: 12px; padding: 1.5rem;
+    margin-bottom: 1.5rem; border: 1px solid #2a2a4a;
+  }
+  .card h2 { color: var(--highlight); margin-bottom: 0.5rem; font-size: 1.4rem; }
+  .card h3 { color: var(--warn); margin: 1rem 0 0.5rem; font-size: 1.1rem; }
+  .controls {
+    display: flex; flex-wrap: wrap; gap: 1rem; align-items: center;
+    margin: 1rem 0; padding: 1rem; background: rgba(0,0,0,0.2); border-radius: 8px;
+  }
+  .control-group { display: flex; flex-direction: column; gap: 0.2rem; }
+  .control-group label { font-size: 0.8rem; color: var(--muted); }
+  input[type=range] { width: 150px; accent-color: var(--highlight); }
+  input[type=number] {
+    width: 80px; background: #222; color: var(--text); border: 1px solid #444;
+    padding: 0.3rem; border-radius: 4px; text-align: center;
+  }
+  button.run-btn {
+    background: var(--highlight); color: white; border: none;
+    padding: 0.6rem 1.5rem; border-radius: 8px; cursor: pointer;
+    font-size: 1rem; font-weight: bold; transition: all 0.2s;
+  }
+  button.run-btn:hover { transform: scale(1.05); filter: brightness(1.2); }
+  canvas {
+    width: 100%; max-width: 800px; display: block;
+    margin: 1rem auto; border-radius: 8px;
+    background: #111;
+  }
+  .result-box {
+    background: rgba(0,0,0,0.3); padding: 1rem; border-radius: 8px;
+    margin-top: 1rem; font-family: 'Consolas', monospace; font-size: 0.95rem;
+    border-left: 3px solid var(--highlight);
+  }
+  .emoji { font-size: 1.5rem; margin-right: 0.5rem; }
+  .explanation {
+    background: rgba(46,204,113,0.1); border: 1px solid rgba(46,204,113,0.3);
+    padding: 1rem; border-radius: 8px; margin-top: 1rem;
+  }
+  .explanation strong { color: var(--success); }
+  .warn-box {
+    background: rgba(243,156,18,0.1); border: 1px solid rgba(243,156,18,0.3);
+    padding: 1rem; border-radius: 8px; margin-top: 1rem;
+  }
+  table {
+    border-collapse: collapse; margin: 1rem 0; width: 100%;
+  }
+  th, td {
+    border: 1px solid #444; padding: 0.5rem 1rem; text-align: center;
+  }
+  th { background: var(--accent); }
+  .sig { color: var(--highlight); font-weight: bold; }
+  .ns { color: var(--success); }
+  @media (max-width: 600px) {
+    .controls { flex-direction: column; }
+    input[type=range] { width: 100%; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Lecture 12 Explorer</h1>
+  <p>Interactive playground for Z-tests, Chi-Square, t-distributions &amp; t-tests</p>
+</header>
+
+<nav>
+  <button class="active" onclick="showSection('intro')">Intro</button>
+  <button onclick="showSection('ztest')">Z-Test</button>
+  <button onclick="showSection('stderr')">Standard Error</button>
+  <button onclick="showSection('chisq-dist')">Chi-Square Dist</button>
+  <button onclick="showSection('chisq-test')">Chi-Square Test</button>
+  <button onclick="showSection('tdist')">t-Distribution</button>
+  <button onclick="showSection('ttest')">t-Test</button>
+</nav>
+
+<!-- ==================== INTRO ==================== -->
+<div id="intro" class="section active">
+  <div class="card">
+    <h2><span class="emoji">🎯</span>Welcome!</h2>
+    <p>This app brings <strong>Lecture 12</strong> to life with interactive demos. Each section lets you tweak parameters and see how statistical tests behave — no R required!</p>
+    <h3>What's covered:</h3>
+    <ol style="padding-left:1.5rem; margin-top:0.5rem;">
+      <li><strong>Z-Test</strong> — Testing a sample mean against a known population</li>
+      <li><strong>Standard Error</strong> — Why sample size matters</li>
+      <li><strong>Chi-Square Distribution</strong> — Sum of squared normals</li>
+      <li><strong>Chi-Square (Pearson) Test</strong> — Testing independence in tables</li>
+      <li><strong>t-Distribution</strong> — When you don't know the true SD</li>
+      <li><strong>t-Test</strong> — Comparing two group means</li>
+    </ol>
+    <div class="explanation" style="margin-top:1.5rem;">
+      <strong>Tip:</strong> Click the tabs above to explore each topic. Every section has sliders and buttons — play with them!
+    </div>
+  </div>
+</div>
+
+<!-- ==================== Z-TEST ==================== -->
+<div id="ztest" class="section">
+  <div class="card">
+    <h2><span class="emoji">☕</span>The Z-Test — Is the Coffee Machine Broken?</h2>
+    <p>A coffee machine should pour <strong>μ = 250 ml</strong> per cup with a known <strong>σ = 15 ml</strong>. You suspect it's overfilling. Measure some cups and test!</p>
+
+    <div class="controls">
+      <div class="control-group">
+        <label>Sample mean (ml): <span id="zMeanVal">260</span></label>
+        <input type="range" id="zMean" min="240" max="280" value="260" step="1"
+               oninput="document.getElementById('zMeanVal').textContent=this.value">
+      </div>
+      <div class="control-group">
+        <label>Sample size (n): <span id="zNVal">5</span></label>
+        <input type="range" id="zN" min="1" max="100" value="5" step="1"
+               oninput="document.getElementById('zNVal').textContent=this.value">
+      </div>
+      <div class="control-group">
+        <label>Population σ = 15 ml, μ₀ = 250 ml</label>
+      </div>
+      <button class="run-btn" onclick="runZTest()">Run Z-Test</button>
+    </div>
+
+    <canvas id="zCanvas" width="800" height="350"></canvas>
+    <div id="zResult" class="result-box">Adjust the sliders and hit Run!</div>
+
+    <div class="explanation">
+      <strong>Key idea:</strong> Z = (X̄ - μ₀) / (σ / √n). We convert to standard normal form by subtracting the mean and dividing by the <em>standard error</em> (σ/√n). A bigger sample size → smaller SE → easier to detect real differences.
+    </div>
+  </div>
+
+  <!-- Z-test sanity check -->
+  <div class="card">
+    <h2><span class="emoji">🔬</span>Sanity Check — P-values Should Be Uniform Under H₀</h2>
+    <p>If we repeatedly sample from the <em>null</em> population (true mean = 250), the p-values should form a <strong>uniform distribution</strong>. This is the fundamental contract of a valid test!</p>
+    <div class="controls">
+      <div class="control-group">
+        <label>Sample size per trial: <span id="zSanNVal">10</span></label>
+        <input type="range" id="zSanN" min="2" max="50" value="10" step="1"
+               oninput="document.getElementById('zSanNVal').textContent=this.value">
+      </div>
+      <div class="control-group">
+        <label>Trials: <span id="zSanTrialsVal">5000</span></label>
+        <input type="range" id="zSanTrials" min="500" max="20000" value="5000" step="500"
+               oninput="document.getElementById('zSanTrialsVal').textContent=this.value">
+      </div>
+      <button class="run-btn" onclick="runZSanity()">Run Sanity Check</button>
+    </div>
+    <canvas id="zSanCanvas" width="800" height="300"></canvas>
+    <div id="zSanResult" class="result-box">Click Run to simulate!</div>
+  </div>
+</div>
+
+<!-- ==================== STANDARD ERROR ==================== -->
+<div id="stderr" class="section">
+  <div class="card">
+    <h2><span class="emoji">📏</span>Standard Error — Precision Grows With Sample Size</h2>
+    <p>The <strong>standard error of the mean</strong> = σ / √n. Watch how the sampling distribution of the mean gets narrower as you increase n!</p>
+
+    <div class="controls">
+      <div class="control-group">
+        <label>Population σ: <span id="seSDVal">12</span></label>
+        <input type="range" id="seSD" min="1" max="30" value="12" step="1"
+               oninput="document.getElementById('seSDVal').textContent=this.value; drawSE()">
+      </div>
+    </div>
+
+    <canvas id="seCanvas" width="800" height="400"></canvas>
+    <div id="seResult" class="result-box"></div>
+
+    <div class="explanation">
+      <strong>Why it matters:</strong> When n = 1, SE = σ (lots of uncertainty). By n = 100, SE = σ/10 (very precise). This is why the Z-test uses σ/√n — it accounts for how much <em>averages</em> vary, not individual observations.
+    </div>
+  </div>
+</div>
+
+<!-- ==================== CHI-SQUARE DISTRIBUTION ==================== -->
+<div id="chisq-dist" class="section">
+  <div class="card">
+    <h2><span class="emoji">📊</span>Chi-Square Distribution — Sum of Squared Normals</h2>
+    <p>Take k independent standard normal values, square each one, and sum them up. That sum follows a <strong>χ²(k)</strong> distribution. The mean = k.</p>
+
+    <div class="controls">
+      <div class="control-group">
+        <label>Degrees of freedom (k): <span id="chiKVal">5</span></label>
+        <input type="range" id="chiK" min="1" max="30" value="5" step="1"
+               oninput="document.getElementById('chiKVal').textContent=this.value">
+      </div>
+      <div class="control-group">
+        <label>Bootstrap samples: <span id="chiTrialsVal">10000</span></label>
+        <input type="range" id="chiTrials" min="1000" max="30000" value="10000" step="1000"
+               oninput="document.getElementById('chiTrialsVal').textContent=this.value">
+      </div>
+      <button class="run-btn" onclick="runChiSqDist()">Simulate!</button>
+    </div>
+    <canvas id="chiDistCanvas" width="800" height="350"></canvas>
+    <div id="chiDistResult" class="result-box">Click Simulate to compare bootstrap vs. theory!</div>
+
+    <div class="explanation">
+      <strong>From the lecture:</strong> The red line is the theoretical χ²(k) density (dchisq in R). The blue histogram is the bootstrap — sum of k squared N(0,1) draws. They match beautifully!
+    </div>
+  </div>
+</div>
+
+<!-- ==================== CHI-SQUARE TEST ==================== -->
+<div id="chisq-test" class="section">
+  <div class="card">
+    <h2><span class="emoji">🐱</span>Pearson's Chi-Square Test — Do Cats Pick Favourite Nap Spots?</h2>
+    <p>You observe 3 cats over a week. Each nap is logged by location. Is nap-spot preference <strong>independent</strong> of cat identity?</p>
+
+    <table id="catTable">
+      <tr><th></th><th>🛋️ Couch</th><th>🛏️ Bed</th><th>☀️ Sunbeam</th><th>📦 Box</th></tr>
+      <tr><td><strong>Whiskers</strong></td>
+        <td><input type="number" value="25" min="0" class="cat-cell"></td>
+        <td><input type="number" value="10" min="0" class="cat-cell"></td>
+        <td><input type="number" value="30" min="0" class="cat-cell"></td>
+        <td><input type="number" value="5" min="0" class="cat-cell"></td>
+      </tr>
+      <tr><td><strong>Mittens</strong></td>
+        <td><input type="number" value="15" min="0" class="cat-cell"></td>
+        <td><input type="number" value="20" min="0" class="cat-cell"></td>
+        <td><input type="number" value="12" min="0" class="cat-cell"></td>
+        <td><input type="number" value="18" min="0" class="cat-cell"></td>
+      </tr>
+      <tr><td><strong>Shadow</strong></td>
+        <td><input type="number" value="10" min="0" class="cat-cell"></td>
+        <td><input type="number" value="8" min="0" class="cat-cell"></td>
+        <td><input type="number" value="5" min="0" class="cat-cell"></td>
+        <td><input type="number" value="32" min="0" class="cat-cell"></td>
+      </tr>
+    </table>
+
+    <button class="run-btn" onclick="runChiSqTest()">Run Chi-Square Test</button>
+    <button class="run-btn" style="background:var(--accent);margin-left:0.5rem" onclick="randomizeCats()">Randomize (Independent)</button>
+
+    <canvas id="chiTestCanvas" width="800" height="300"></canvas>
+    <div id="chiTestResult" class="result-box">Edit the table and click Run!</div>
+
+    <div class="explanation">
+      <strong>How it works:</strong> Expected = (row sum × col sum) / total. Then χ² = Σ (observed - expected)² / expected. The p-value comes from pchisq with df = (rows-1)(cols-1). If cats truly don't care, clicking "Randomize" gives high p-values!
+    </div>
+  </div>
+
+  <!-- Chi-square sanity -->
+  <div class="card">
+    <h2><span class="emoji">✅</span>Sanity Check — Independent Data → Uniform P-values</h2>
+    <p>Randomly assign categories independently and run chi-square tests. The p-values should be <strong>uniform</strong> — just like the lecture showed!</p>
+    <div class="controls">
+      <div class="control-group">
+        <label>Rows × Cols: 3 × 4, N per trial: <span id="chiSanNVal">200</span></label>
+        <input type="range" id="chiSanN" min="50" max="1000" value="200" step="50"
+               oninput="document.getElementById('chiSanNVal').textContent=this.value">
+      </div>
+      <div class="control-group">
+        <label>Trials: <span id="chiSanTrialsVal">5000</span></label>
+        <input type="range" id="chiSanTrials" min="500" max="10000" value="5000" step="500"
+               oninput="document.getElementById('chiSanTrialsVal').textContent=this.value">
+      </div>
+      <button class="run-btn" onclick="runChiSanity()">Run!</button>
+    </div>
+    <canvas id="chiSanCanvas" width="800" height="280"></canvas>
+    <div id="chiSanResult" class="result-box">Click Run to simulate!</div>
+  </div>
+</div>
+
+<!-- ==================== T-DISTRIBUTION ==================== -->
+<div id="tdist" class="section">
+  <div class="card">
+    <h2><span class="emoji">🔔</span>t-Distribution vs. Normal — Heavier Tails When df Is Small</h2>
+    <p>When you <em>estimate</em> the standard deviation from your sample, the test statistic follows a <strong>t-distribution</strong> instead of a normal. At small df, the tails are fatter (more conservative). As df → ∞, t → Z.</p>
+
+    <div class="controls">
+      <div class="control-group">
+        <label>Degrees of freedom: <span id="tdfVal">5</span></label>
+        <input type="range" id="tdf" min="1" max="200" value="5" step="1"
+               oninput="document.getElementById('tdfVal').textContent=this.value; drawTDist()">
+      </div>
+    </div>
+    <canvas id="tDistCanvas" width="800" height="350"></canvas>
+    <div id="tDistResult" class="result-box"></div>
+
+    <div class="explanation">
+      <strong>From the lecture:</strong> At df = 5, you need to be further from the center to get the same p-value as with a normal. At df = 1000, they're essentially identical. This is why big sample sizes make the t-test and Z-test equivalent.
+    </div>
+  </div>
+
+  <!-- The broken Z-test demo -->
+  <div class="card">
+    <h2><span class="emoji">💥</span>Why Z Breaks When You Estimate σ</h2>
+    <p>The lecture's key "aha" moment: if you use <code>sd(sample)</code> instead of the true σ in a Z-test, the p-values are <strong>no longer uniform</strong> under H₀. Switch to the t-distribution and it's fixed!</p>
+    <div class="controls">
+      <div class="control-group">
+        <label>Sample size: <span id="brokenNVal">10</span></label>
+        <input type="range" id="brokenN" min="3" max="50" value="10" step="1"
+               oninput="document.getElementById('brokenNVal').textContent=this.value">
+      </div>
+      <div class="control-group">
+        <label>Trials: <span id="brokenTrialsVal">10000</span></label>
+        <input type="range" id="brokenTrials" min="1000" max="20000" value="10000" step="1000"
+               oninput="document.getElementById('brokenTrialsVal').textContent=this.value">
+      </div>
+      <button class="run-btn" onclick="runBrokenZ()">Show the Problem!</button>
+    </div>
+    <canvas id="brokenZCanvas" width="800" height="300"></canvas>
+    <canvas id="fixedTCanvas" width="800" height="300"></canvas>
+    <div id="brokenResult" class="result-box">Click to see the Z-test break and the t-test fix it!</div>
+  </div>
+</div>
+
+<!-- ==================== T-TEST ==================== -->
+<div id="ttest" class="section">
+  <div class="card">
+    <h2><span class="emoji">🎵</span>The t-Test — Does Music Help You Study?</h2>
+    <p>Two groups of students take a test. One studied with music, one without. Generate data and test whether the means differ!</p>
+
+    <div class="controls">
+      <div class="control-group">
+        <label>Music group mean: <span id="ttMu1Val">78</span></label>
+        <input type="range" id="ttMu1" min="50" max="100" value="78" step="1"
+               oninput="document.getElementById('ttMu1Val').textContent=this.value">
+      </div>
+      <div class="control-group">
+        <label>No-music group mean: <span id="ttMu2Val">72</span></label>
+        <input type="range" id="ttMu2" min="50" max="100" value="72" step="1"
+               oninput="document.getElementById('ttMu2Val').textContent=this.value">
+      </div>
+      <div class="control-group">
+        <label>SD (both groups): <span id="ttSDVal">10</span></label>
+        <input type="range" id="ttSD" min="1" max="30" value="10" step="1"
+               oninput="document.getElementById('ttSDVal').textContent=this.value">
+      </div>
+      <div class="control-group">
+        <label>n per group: <span id="ttNVal">15</span></label>
+        <input type="range" id="ttN" min="3" max="100" value="15" step="1"
+               oninput="document.getElementById('ttNVal').textContent=this.value">
+      </div>
+      <button class="run-btn" onclick="runTTest()">Generate & Test</button>
+    </div>
+    <canvas id="ttCanvas" width="800" height="350"></canvas>
+    <div id="ttResult" class="result-box">Adjust parameters and hit Generate!</div>
+
+    <div class="explanation">
+      <strong>The formula:</strong> t = (X̄₁ - X̄₂) / √(s²pooled · (1/n₁ + 1/n₂)), with df = n₁ + n₂ - 2 (equal variance assumed). Just like the lecture's implementation! Try setting both means equal and watch the p-value be non-significant.
+    </div>
+  </div>
+
+  <!-- t-test sanity check -->
+  <div class="card">
+    <h2><span class="emoji">🧪</span>t-Test Sanity Check — Equal Means → Uniform P-values</h2>
+    <div class="controls">
+      <div class="control-group">
+        <label>n per group: <span id="ttSanNVal">10</span></label>
+        <input type="range" id="ttSanN" min="3" max="50" value="10" step="1"
+               oninput="document.getElementById('ttSanNVal').textContent=this.value">
+      </div>
+      <div class="control-group">
+        <label>Trials: <span id="ttSanTrialsVal">5000</span></label>
+        <input type="range" id="ttSanTrials" min="500" max="15000" value="5000" step="500"
+               oninput="document.getElementById('ttSanTrialsVal').textContent=this.value">
+      </div>
+      <button class="run-btn" onclick="runTTestSanity()">Run!</button>
+    </div>
+    <canvas id="ttSanCanvas" width="800" height="280"></canvas>
+    <div id="ttSanResult" class="result-box">Click Run!</div>
+  </div>
+
+  <!-- Unequal variance demo -->
+  <div class="card">
+    <h2><span class="emoji">⚠️</span>When Equal Variance Breaks</h2>
+    <p>The standard t-test assumes equal variance. What happens when one group has much larger variance? The p-values are no longer uniform! (Welch's t-test fixes this.)</p>
+    <div class="controls">
+      <div class="control-group">
+        <label>Group 1 σ: <span id="uvSD1Val">10</span></label>
+        <input type="range" id="uvSD1" min="1" max="30" value="10" step="1"
+               oninput="document.getElementById('uvSD1Val').textContent=this.value">
+      </div>
+      <div class="control-group">
+        <label>Group 2 σ: <span id="uvSD2Val">30</span></label>
+        <input type="range" id="uvSD2" min="1" max="60" value="30" step="1"
+               oninput="document.getElementById('uvSD2Val').textContent=this.value">
+      </div>
+      <div class="control-group">
+        <label>n per group: <span id="uvNVal">10</span></label>
+        <input type="range" id="uvN" min="3" max="50" value="10" step="1"
+               oninput="document.getElementById('uvNVal').textContent=this.value">
+      </div>
+      <button class="run-btn" onclick="runUnequalVar()">Show the Problem!</button>
+    </div>
+    <canvas id="uvCanvas" width="800" height="280"></canvas>
+    <div id="uvResult" class="result-box">Click to see unequal variance break the t-test!</div>
+  </div>
+</div>
+
+<footer style="text-align:center;padding:2rem;color:var(--muted);font-size:0.85rem;">
+  Lecture 12 Explorer — Interactive demos for statistical inference
+</footer>
+
+<script>
+// ===== MATH UTILITIES =====
+function rnorm() {
+  // Box-Muller transform
+  let u1 = Math.random(), u2 = Math.random();
+  return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+}
+function rnormMuSd(mu, sd) { return mu + sd * rnorm(); }
+function mean(arr) { return arr.reduce((a,b) => a+b, 0) / arr.length; }
+function variance(arr) {
+  const m = mean(arr);
+  return arr.reduce((s,x) => s + (x-m)**2, 0) / (arr.length - 1);
+}
+function sd(arr) { return Math.sqrt(variance(arr)); }
+
+// Normal PDF
+function dnorm(x, mu=0, sigma=1) {
+  const z = (x - mu) / sigma;
+  return Math.exp(-0.5 * z * z) / (sigma * Math.sqrt(2 * Math.PI));
+}
+
+// Normal CDF (Abramowitz & Stegun approximation)
+function pnorm(x) {
+  const a1=0.254829592, a2=-0.284496736, a3=1.421413741, a4=-1.453152027, a5=1.061405429;
+  const sign = x < 0 ? -1 : 1;
+  x = Math.abs(x) / Math.SQRT2;
+  const t = 1 / (1 + 0.3275911 * x);
+  const y = 1 - (((((a5*t + a4)*t) + a3)*t + a2)*t + a1)*t * Math.exp(-x*x);
+  return 0.5 * (1 + sign * y);
+}
+
+// Chi-square PDF
+function dchisq(x, k) {
+  if (x <= 0) return 0;
+  const halfK = k / 2;
+  return Math.pow(x, halfK - 1) * Math.exp(-x/2) / (Math.pow(2, halfK) * gammaFunc(halfK));
+}
+
+// Chi-square CDF (numerical integration via regularized gamma)
+function pchisq(x, k) {
+  if (x <= 0) return 0;
+  return regularizedGammaP(k/2, x/2);
+}
+
+// t-distribution PDF
+function dt(x, df) {
+  const halfDfPlus1 = (df + 1) / 2;
+  const halfDf = df / 2;
+  return gammaFunc(halfDfPlus1) / (Math.sqrt(df * Math.PI) * gammaFunc(halfDf))
+       * Math.pow(1 + x*x/df, -halfDfPlus1);
+}
+
+// t-distribution CDF (numerical integration)
+function pt(x, df) {
+  // Use regularized incomplete beta function
+  const t2 = x * x;
+  const p = 0.5 * regularizedBetaI(df / (df + t2), df/2, 0.5);
+  return x >= 0 ? 1 - p : p;
+}
+
+// Gamma function (Lanczos approximation)
+function gammaFunc(z) {
+  if (z < 0.5) return Math.PI / (Math.sin(Math.PI * z) * gammaFunc(1 - z));
+  z -= 1;
+  const g = 7;
+  const c = [0.99999999999980993,676.5203681218851,-1259.1392167224028,
+    771.32342877765313,-176.61502916214059,12.507343278686905,
+    -0.13857109526572012,9.9843695780195716e-6,1.5056327351493116e-7];
+  let x = c[0];
+  for (let i = 1; i < g + 2; i++) x += c[i] / (z + i);
+  const t = z + g + 0.5;
+  return Math.sqrt(2 * Math.PI) * Math.pow(t, z + 0.5) * Math.exp(-t) * x;
+}
+
+// Regularized incomplete gamma function P(a, x)
+function regularizedGammaP(a, x) {
+  if (x < 0) return 0;
+  if (x === 0) return 0;
+  if (x < a + 1) {
+    // Series expansion
+    let sum = 1/a, term = 1/a;
+    for (let n = 1; n < 200; n++) {
+      term *= x / (a + n);
+      sum += term;
+      if (Math.abs(term) < 1e-12 * Math.abs(sum)) break;
+    }
+    return sum * Math.exp(-x + a * Math.log(x) - lgamma(a));
+  } else {
+    // Continued fraction
+    return 1 - regularizedGammaQ(a, x);
+  }
+}
+
+function regularizedGammaQ(a, x) {
+  let f = 1e-30, c = 1e-30, d = 0;
+  for (let i = 1; i < 200; i++) {
+    const an = (i % 2 === 1) ? ((i+1)/2 - a) : i/2;
+    const bn = x + i - a;
+    d = bn + an * d; if (Math.abs(d) < 1e-30) d = 1e-30;
+    c = bn + an / c; if (Math.abs(c) < 1e-30) c = 1e-30;
+    d = 1 / d;
+    f *= d * c;
+  }
+  // This is a rough approximation; use series for better accuracy
+  // Fallback: use the complement of series
+  return 1 - regularizedGammaP_series(a, x);
+}
+
+function regularizedGammaP_series(a, x) {
+  let sum = 1/a, term = 1/a;
+  for (let n = 1; n < 300; n++) {
+    term *= x / (a + n);
+    sum += term;
+    if (Math.abs(term) < 1e-14 * Math.abs(sum)) break;
+  }
+  return sum * Math.exp(-x + a * Math.log(x) - lgamma(a));
+}
+
+function lgamma(x) { return Math.log(gammaFunc(x)); }
+
+// Regularized incomplete beta function I_x(a,b)
+function regularizedBetaI(x, a, b) {
+  if (x <= 0) return 0;
+  if (x >= 1) return 1;
+  if (x > (a + 1) / (a + b + 2)) {
+    return 1 - regularizedBetaI(1 - x, b, a);
+  }
+  // Continued fraction (Lentz's method)
+  const lbeta = lgamma(a) + lgamma(b) - lgamma(a + b);
+  const front = Math.exp(Math.log(x) * a + Math.log(1 - x) * b - lbeta) / a;
+  let f = 1, c = 1, d = 0;
+  for (let i = 0; i <= 200; i++) {
+    let m = Math.floor(i / 2);
+    let numerator;
+    if (i === 0) {
+      numerator = 1;
+    } else if (i % 2 === 0) {
+      numerator = m * (b - m) * x / ((a + 2*m - 1) * (a + 2*m));
+    } else {
+      numerator = -((a + m) * (a + b + m) * x) / ((a + 2*m) * (a + 2*m + 1));
+    }
+    d = 1 + numerator * d;
+    if (Math.abs(d) < 1e-30) d = 1e-30;
+    d = 1 / d;
+    c = 1 + numerator / c;
+    if (Math.abs(c) < 1e-30) c = 1e-30;
+    f *= d * c;
+    if (Math.abs(d * c - 1) < 1e-12) break;
+  }
+  return front * (f - 1);
+}
+
+
+// ===== DRAWING UTILITIES =====
+function getCtx(id) {
+  const c = document.getElementById(id);
+  c.width = c.width; // clear
+  return c.getContext('2d');
+}
+
+function drawHistogram(ctx, data, numBins, color, title, xLabel, lo, hi, overlayFn, overlayColor) {
+  const W = ctx.canvas.width, H = ctx.canvas.height;
+  const pad = { l: 60, r: 20, t: 40, b: 45 };
+  const plotW = W - pad.l - pad.r, plotH = H - pad.t - pad.b;
+
+  if (lo === undefined) lo = Math.min(...data);
+  if (hi === undefined) hi = Math.max(...data);
+  if (hi === lo) { hi = lo + 1; }
+  const binWidth = (hi - lo) / numBins;
+  const bins = new Array(numBins).fill(0);
+  for (const v of data) {
+    let idx = Math.floor((v - lo) / binWidth);
+    if (idx >= numBins) idx = numBins - 1;
+    if (idx < 0) idx = 0;
+    bins[idx]++;
+  }
+  const maxBin = Math.max(...bins, 1);
+
+  // axes
+  ctx.strokeStyle = '#555'; ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(pad.l, pad.t); ctx.lineTo(pad.l, H - pad.b); ctx.lineTo(W - pad.r, H - pad.b);
+  ctx.stroke();
+
+  // bars
+  ctx.fillStyle = color;
+  for (let i = 0; i < numBins; i++) {
+    const x = pad.l + (i / numBins) * plotW;
+    const w = plotW / numBins - 1;
+    const h = (bins[i] / maxBin) * plotH;
+    ctx.fillRect(x, H - pad.b - h, w, h);
+  }
+
+  // overlay curve
+  if (overlayFn) {
+    ctx.strokeStyle = overlayColor || '#e94560';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    const steps = 200;
+    // Scale: density * data.length * binWidth = expected count
+    for (let s = 0; s <= steps; s++) {
+      const xVal = lo + (hi - lo) * s / steps;
+      const density = overlayFn(xVal);
+      const yCount = density * data.length * binWidth;
+      const px = pad.l + (s / steps) * plotW;
+      const py = H - pad.b - (yCount / maxBin) * plotH;
+      if (s === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+  }
+
+  // x-axis labels
+  ctx.fillStyle = '#aab'; ctx.font = '11px Segoe UI'; ctx.textAlign = 'center';
+  for (let i = 0; i <= 5; i++) {
+    const val = lo + (hi - lo) * i / 5;
+    const px = pad.l + (i / 5) * plotW;
+    ctx.fillText(val.toFixed(val > 100 ? 0 : 2), px, H - pad.b + 18);
+  }
+
+  // title
+  ctx.fillStyle = '#eee'; ctx.font = 'bold 14px Segoe UI'; ctx.textAlign = 'center';
+  ctx.fillText(title, W / 2, pad.t - 12);
+
+  // x-label
+  ctx.fillStyle = '#aab'; ctx.font = '12px Segoe UI';
+  ctx.fillText(xLabel || '', W / 2, H - 5);
+
+  // y-axis label
+  ctx.save();
+  ctx.translate(15, H / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText('Count', 0, 0);
+  ctx.restore();
+}
+
+
+// ===== SECTION NAVIGATION =====
+function showSection(id) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+
+  // Auto-draw for sections with live sliders
+  if (id === 'stderr') drawSE();
+  if (id === 'tdist') drawTDist();
+}
+
+
+// ===== Z-TEST =====
+function runZTest() {
+  const sampleMean = +document.getElementById('zMean').value;
+  const n = +document.getElementById('zN').value;
+  const mu0 = 250, sigma = 15;
+  const se = sigma / Math.sqrt(n);
+  const z = (sampleMean - mu0) / se;
+  const pVal = 2 * (1 - pnorm(Math.abs(z)));
+
+  // Draw the standard normal with shaded rejection region
+  const ctx = getCtx('zCanvas');
+  const W = ctx.canvas.width, H = ctx.canvas.height;
+  const pad = { l: 60, r: 20, t: 50, b: 45 };
+  const plotW = W - pad.l - pad.r, plotH = H - pad.t - pad.b;
+
+  // Draw curve
+  const xLo = -4.5, xHi = 4.5;
+  const steps = 300;
+
+  // axes
+  ctx.strokeStyle = '#555'; ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(pad.l, H - pad.b); ctx.lineTo(W - pad.r, H - pad.b);
+  ctx.stroke();
+
+  function xToP(x) { return pad.l + ((x - xLo) / (xHi - xLo)) * plotW; }
+  function yToP(y) { return H - pad.b - (y / 0.42) * plotH; }
+
+  // Shade rejection area
+  const absZ = Math.abs(z);
+  if (absZ < xHi) {
+    ctx.fillStyle = 'rgba(233,69,96,0.3)';
+    // Right tail
+    ctx.beginPath(); ctx.moveTo(xToP(absZ), yToP(0));
+    for (let s = 0; s <= 100; s++) {
+      const xv = absZ + (xHi - absZ) * s / 100;
+      ctx.lineTo(xToP(xv), yToP(dnorm(xv)));
+    }
+    ctx.lineTo(xToP(xHi), yToP(0)); ctx.fill();
+    // Left tail
+    ctx.beginPath(); ctx.moveTo(xToP(-absZ), yToP(0));
+    for (let s = 0; s <= 100; s++) {
+      const xv = -absZ - (xHi - absZ) * s / 100;
+      ctx.lineTo(xToP(xv), yToP(dnorm(xv)));
+    }
+    ctx.lineTo(xToP(-xHi), yToP(0)); ctx.fill();
+  }
+
+  // Draw normal curve
+  ctx.strokeStyle = '#4fc3f7'; ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  for (let s = 0; s <= steps; s++) {
+    const xv = xLo + (xHi - xLo) * s / steps;
+    const px = xToP(xv), py = yToP(dnorm(xv));
+    if (s === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+  }
+  ctx.stroke();
+
+  // Mark Z value
+  if (absZ < xHi) {
+    ctx.strokeStyle = '#f39c12'; ctx.lineWidth = 2;
+    ctx.setLineDash([5, 5]);
+    ctx.beginPath(); ctx.moveTo(xToP(z), yToP(0)); ctx.lineTo(xToP(z), yToP(dnorm(z)));
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.fillStyle = '#f39c12'; ctx.font = 'bold 13px Segoe UI'; ctx.textAlign = 'center';
+    ctx.fillText(`Z = ${z.toFixed(2)}`, xToP(z), yToP(dnorm(z)) - 10);
+  }
+
+  // x-axis labels
+  ctx.fillStyle = '#aab'; ctx.font = '11px Segoe UI'; ctx.textAlign = 'center';
+  for (let i = -4; i <= 4; i++) {
+    ctx.fillText(i.toString(), xToP(i), H - pad.b + 18);
+  }
+
+  // Title
+  ctx.fillStyle = '#eee'; ctx.font = 'bold 14px Segoe UI';
+  ctx.fillText('Standard Normal Distribution with Z-score', W / 2, pad.t - 15);
+  ctx.fillStyle = '#aab'; ctx.font = '12px Segoe UI';
+  ctx.fillText('Z (standard deviations from mean)', W / 2, H - 5);
+
+  // Result
+  const sig = pVal < 0.05;
+  document.getElementById('zResult').innerHTML =
+    `<b>Sample mean:</b> ${sampleMean} ml &nbsp; | &nbsp; <b>n:</b> ${n} &nbsp; | &nbsp; <b>SE:</b> σ/√n = ${se.toFixed(2)} ml<br>` +
+    `<b>Z-score:</b> (${sampleMean} − ${mu0}) / ${se.toFixed(2)} = <b>${z.toFixed(3)}</b><br>` +
+    `<b>Two-sided p-value:</b> <span class="${sig?'sig':'ns'}">${pVal < 0.0001 ? pVal.toExponential(3) : pVal.toFixed(4)}</span><br>` +
+    `<b>Verdict:</b> ${sig ? '☕ The machine IS likely overfilling! (p < 0.05)' : '✅ No convincing evidence of overfilling (p ≥ 0.05)'}`;
+}
+
+// Z-test sanity check
+function runZSanity() {
+  const n = +document.getElementById('zSanN').value;
+  const trials = +document.getElementById('zSanTrials').value;
+  const mu = 250, sigma = 15;
+  const pvals = [];
+  for (let i = 0; i < trials; i++) {
+    const sample = [];
+    for (let j = 0; j < n; j++) sample.push(rnormMuSd(mu, sigma));
+    const se = sigma / Math.sqrt(n);
+    const z = -Math.abs((mean(sample) - mu) / se);
+    pvals.push(2 * pnorm(z));
+  }
+  const ctx = getCtx('zSanCanvas');
+  drawHistogram(ctx, pvals, 50, 'rgba(79,195,247,0.7)', 'Z-test P-values Under H₀ (should be uniform)', 'P-value', 0, 1);
+  document.getElementById('zSanResult').innerHTML =
+    `<b>${trials} trials</b>, n = ${n} each, true μ = ${mu}, σ = ${sigma}. The histogram should be flat (uniform). ` +
+    `Mean p-value = ${mean(pvals).toFixed(3)} (expect ~0.5).`;
+}
+
+
+// ===== STANDARD ERROR =====
+function drawSE() {
+  const sigma = +document.getElementById('seSD').value;
+  const ctx = getCtx('seCanvas');
+  const W = ctx.canvas.width, H = ctx.canvas.height;
+  const pad = { l: 60, r: 20, t: 50, b: 55 };
+  const plotW = W - pad.l - pad.r, plotH = H - pad.t - pad.b;
+
+  const mu = 100;
+  const nValues = [1, 4, 10, 25, 100];
+  const colors = ['#e94560', '#f39c12', '#2ecc71', '#4fc3f7', '#9b59b6'];
+
+  const xLo = mu - 3.5 * sigma, xHi = mu + 3.5 * sigma;
+  const steps = 200;
+
+  // Find max density for scaling
+  let maxD = 0;
+  for (const n of nValues) {
+    const se = sigma / Math.sqrt(n);
+    maxD = Math.max(maxD, dnorm(mu, mu, se));
+  }
+
+  function xToP(x) { return pad.l + ((x - xLo) / (xHi - xLo)) * plotW; }
+  function yToP(y) { return H - pad.b - (y / (maxD * 1.1)) * plotH; }
+
+  // x-axis
+  ctx.strokeStyle = '#555'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(pad.l, H - pad.b); ctx.lineTo(W - pad.r, H - pad.b); ctx.stroke();
+
+  // Draw each curve
+  for (let ni = 0; ni < nValues.length; ni++) {
+    const n = nValues[ni];
+    const se = sigma / Math.sqrt(n);
+    ctx.strokeStyle = colors[ni]; ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let s = 0; s <= steps; s++) {
+      const xv = xLo + (xHi - xLo) * s / steps;
+      const d = dnorm(xv, mu, se);
+      const px = xToP(xv), py = yToP(d);
+      if (s === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+
+    // Label
+    ctx.fillStyle = colors[ni]; ctx.font = 'bold 12px Segoe UI'; ctx.textAlign = 'left';
+    const labelY = yToP(dnorm(mu, mu, se)) - 5;
+    ctx.fillText(`n=${n} (SE=${se.toFixed(1)})`, xToP(mu) + 5, Math.max(labelY, pad.t + 15 + ni * 18));
+  }
+
+  // x-axis labels
+  ctx.fillStyle = '#aab'; ctx.font = '11px Segoe UI'; ctx.textAlign = 'center';
+  for (let i = 0; i <= 6; i++) {
+    const val = xLo + (xHi - xLo) * i / 6;
+    ctx.fillText(val.toFixed(0), pad.l + (i / 6) * plotW, H - pad.b + 18);
+  }
+
+  ctx.fillStyle = '#eee'; ctx.font = 'bold 14px Segoe UI'; ctx.textAlign = 'center';
+  ctx.fillText(`Sampling Distribution of the Mean (σ = ${sigma})`, W / 2, pad.t - 15);
+  ctx.fillStyle = '#aab'; ctx.font = '12px Segoe UI';
+  ctx.fillText('Sample Mean', W / 2, H - 5);
+
+  document.getElementById('seResult').innerHTML =
+    `<b>σ = ${sigma}</b> | SE = σ/√n<br>` +
+    nValues.map((n, i) => `<span style="color:${colors[i]}">■</span> n = ${n}: SE = ${(sigma/Math.sqrt(n)).toFixed(2)}`).join(' &nbsp;|&nbsp; ');
+}
+
+
+// ===== CHI-SQUARE DISTRIBUTION =====
+function runChiSqDist() {
+  const k = +document.getElementById('chiK').value;
+  const trials = +document.getElementById('chiTrials').value;
+  const data = [];
+  for (let i = 0; i < trials; i++) {
+    let sum = 0;
+    for (let j = 0; j < k; j++) { const z = rnorm(); sum += z * z; }
+    data.push(sum);
+  }
+  const hi = Math.min(Math.max(...data), k + 5 * Math.sqrt(2 * k));
+  const ctx = getCtx('chiDistCanvas');
+  drawHistogram(ctx, data, 60, 'rgba(79,195,247,0.6)',
+    `χ² Distribution: Bootstrap vs Theory (k = ${k})`, 'χ² value',
+    0, hi, x => dchisq(x, k), '#e94560');
+
+  document.getElementById('chiDistResult').innerHTML =
+    `<b>k = ${k}</b> degrees of freedom | <b>${trials}</b> bootstrap samples<br>` +
+    `Mean of bootstrap: <b>${mean(data).toFixed(2)}</b> (theoretical = ${k})<br>` +
+    `<span style="color:#4fc3f7">■</span> Bootstrap histogram &nbsp; <span style="color:#e94560">■</span> Theoretical χ²(${k}) density`;
+}
+
+
+// ===== CHI-SQUARE TEST =====
+function getCatTable() {
+  const inputs = document.querySelectorAll('.cat-cell');
+  const table = [[],[],[]];
+  let idx = 0;
+  for (let r = 0; r < 3; r++)
+    for (let c = 0; c < 4; c++)
+      table[r][c] = +(inputs[idx++].value) || 0;
+  return table;
+}
+
+function chiSquaredTest(table) {
+  const nRows = table.length, nCols = table[0].length;
+  const rowSums = table.map(r => r.reduce((a,b)=>a+b,0));
+  const colSums = [];
+  for (let c = 0; c < nCols; c++) {
+    let s = 0;
+    for (let r = 0; r < nRows; r++) s += table[r][c];
+    colSums.push(s);
+  }
+  const total = rowSums.reduce((a,b)=>a+b,0);
+  if (total === 0) return { chi2: 0, df: 0, pVal: 1, expected: table };
+
+  const expected = [];
+  let chi2 = 0;
+  for (let r = 0; r < nRows; r++) {
+    expected.push([]);
+    for (let c = 0; c < nCols; c++) {
+      const e = rowSums[r] * colSums[c] / total;
+      expected[r].push(e);
+      if (e > 0) chi2 += (table[r][c] - e) ** 2 / e;
+    }
+  }
+  const df = (nRows - 1) * (nCols - 1);
+  const pVal = 1 - pchisq(chi2, df);
+  return { chi2, df, pVal, expected };
+}
+
+function runChiSqTest() {
+  const table = getCatTable();
+  const { chi2, df, pVal, expected } = chiSquaredTest(table);
+
+  // Draw observed vs expected bar chart
+  const ctx = getCtx('chiTestCanvas');
+  const W = ctx.canvas.width, H = ctx.canvas.height;
+  const pad = { l: 60, r: 20, t: 40, b: 55 };
+  const plotW = W - pad.l - pad.r, plotH = H - pad.t - pad.b;
+  const cats = ['Whiskers', 'Mittens', 'Shadow'];
+  const spots = ['Couch', 'Bed', 'Sunbeam', 'Box'];
+  const colors = ['#e94560', '#4fc3f7', '#2ecc71'];
+  const nBars = 4;
+  const groupW = plotW / nBars;
+
+  let maxVal = 0;
+  for (const row of table) for (const v of row) maxVal = Math.max(maxVal, v);
+  for (const row of expected) for (const v of row) maxVal = Math.max(maxVal, v);
+  maxVal *= 1.15;
+
+  // x-axis
+  ctx.strokeStyle = '#555'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(pad.l, H - pad.b); ctx.lineTo(W - pad.r, H - pad.b); ctx.stroke();
+
+  for (let c = 0; c < nBars; c++) {
+    const gx = pad.l + c * groupW;
+    for (let r = 0; r < 3; r++) {
+      const bw = groupW / 7;
+      const bx = gx + (r * 2 + 0.5) * bw;
+      // Observed
+      const oh = (table[r][c] / maxVal) * plotH;
+      ctx.fillStyle = colors[r];
+      ctx.fillRect(bx, H - pad.b - oh, bw * 0.9, oh);
+      // Expected (outline)
+      const eh = (expected[r][c] / maxVal) * plotH;
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 3]);
+      ctx.strokeRect(bx, H - pad.b - eh, bw * 0.9, eh);
+      ctx.setLineDash([]);
+    }
+    ctx.fillStyle = '#aab'; ctx.font = '12px Segoe UI'; ctx.textAlign = 'center';
+    ctx.fillText(spots[c], gx + groupW / 2, H - pad.b + 18);
+  }
+
+  // Legend
+  ctx.font = '11px Segoe UI'; ctx.textAlign = 'left';
+  for (let r = 0; r < 3; r++) {
+    ctx.fillStyle = colors[r];
+    ctx.fillRect(W - 150, pad.t + r * 18, 12, 12);
+    ctx.fillText(cats[r], W - 134, pad.t + r * 18 + 11);
+  }
+  ctx.fillStyle = '#fff'; ctx.fillText('--- Expected', W - 150, pad.t + 60);
+
+  ctx.fillStyle = '#eee'; ctx.font = 'bold 14px Segoe UI'; ctx.textAlign = 'center';
+  ctx.fillText('Observed (solid) vs Expected (dashed)', W / 2, pad.t - 12);
+
+  const sig = pVal < 0.05;
+  document.getElementById('chiTestResult').innerHTML =
+    `<b>χ² = ${chi2.toFixed(2)}</b> &nbsp; | &nbsp; <b>df = ${df}</b> &nbsp; | &nbsp; ` +
+    `<b>p-value = <span class="${sig?'sig':'ns'}">${pVal < 0.0001 ? pVal.toExponential(3) : pVal.toFixed(4)}</span></b><br>` +
+    (sig ? '🐱 Nap-spot preference IS dependent on cat identity! (p < 0.05)' :
+           '✅ No evidence that cats differ in nap-spot preference (p ≥ 0.05)');
+}
+
+function randomizeCats() {
+  const inputs = document.querySelectorAll('.cat-cell');
+  const n = 200;
+  const vals = new Array(12).fill(0);
+  for (let i = 0; i < n; i++) {
+    const r = Math.floor(Math.random() * 3);
+    const c = Math.floor(Math.random() * 4);
+    vals[r * 4 + c]++;
+  }
+  let idx = 0;
+  for (const v of vals) inputs[idx++].value = v;
+  runChiSqTest();
+}
+
+// Chi-square sanity check
+function runChiSanity() {
+  const N = +document.getElementById('chiSanN').value;
+  const trials = +document.getElementById('chiSanTrials').value;
+  const nRows = 3, nCols = 4;
+  const pvals = [];
+  for (let t = 0; t < trials; t++) {
+    const table = Array.from({length: nRows}, () => new Array(nCols).fill(0));
+    for (let j = 0; j < N; j++) {
+      table[Math.floor(Math.random() * nRows)][Math.floor(Math.random() * nCols)]++;
+    }
+    const { pVal } = chiSquaredTest(table);
+    pvals.push(pVal);
+  }
+  const ctx = getCtx('chiSanCanvas');
+  drawHistogram(ctx, pvals, 50, 'rgba(46,204,113,0.7)',
+    'Chi-Square Test P-values Under Independence (should be uniform)', 'P-value', 0, 1);
+  document.getElementById('chiSanResult').innerHTML =
+    `<b>${trials} trials</b>, ${nRows}×${nCols} table, N = ${N} per trial. ` +
+    `Mean p-value = ${mean(pvals).toFixed(3)} (expect ~0.5).`;
+}
+
+
+// ===== T-DISTRIBUTION =====
+function drawTDist() {
+  const df = +document.getElementById('tdf').value;
+  const ctx = getCtx('tDistCanvas');
+  const W = ctx.canvas.width, H = ctx.canvas.height;
+  const pad = { l: 60, r: 20, t: 50, b: 50 };
+  const plotW = W - pad.l - pad.r, plotH = H - pad.t - pad.b;
+  const xLo = -5, xHi = 5;
+  const steps = 300;
+  const maxD = 0.42;
+
+  function xToP(x) { return pad.l + ((x - xLo) / (xHi - xLo)) * plotW; }
+  function yToP(y) { return H - pad.b - (y / maxD) * plotH; }
+
+  ctx.strokeStyle = '#555'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(pad.l, H - pad.b); ctx.lineTo(W - pad.r, H - pad.b); ctx.stroke();
+
+  // Normal curve
+  ctx.strokeStyle = 'rgba(79,195,247,0.8)'; ctx.lineWidth = 2;
+  ctx.setLineDash([6, 4]);
+  ctx.beginPath();
+  for (let s = 0; s <= steps; s++) {
+    const xv = xLo + (xHi - xLo) * s / steps;
+    const px = xToP(xv), py = yToP(dnorm(xv));
+    if (s === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+  }
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // t-curve
+  ctx.strokeStyle = '#e94560'; ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  for (let s = 0; s <= steps; s++) {
+    const xv = xLo + (xHi - xLo) * s / steps;
+    const px = xToP(xv), py = yToP(dt(xv, df));
+    if (s === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+  }
+  ctx.stroke();
+
+  // x-axis labels
+  ctx.fillStyle = '#aab'; ctx.font = '11px Segoe UI'; ctx.textAlign = 'center';
+  for (let i = -4; i <= 4; i++) {
+    ctx.fillText(i.toString(), xToP(i), H - pad.b + 18);
+  }
+
+  // Legend
+  ctx.font = '12px Segoe UI'; ctx.textAlign = 'left';
+  ctx.strokeStyle = '#e94560'; ctx.lineWidth = 2.5; ctx.setLineDash([]);
+  ctx.beginPath(); ctx.moveTo(W - 200, pad.t + 10); ctx.lineTo(W - 170, pad.t + 10); ctx.stroke();
+  ctx.fillStyle = '#e94560'; ctx.fillText(`t(df = ${df})`, W - 165, pad.t + 15);
+  ctx.strokeStyle = 'rgba(79,195,247,0.8)'; ctx.lineWidth = 2; ctx.setLineDash([6, 4]);
+  ctx.beginPath(); ctx.moveTo(W - 200, pad.t + 30); ctx.lineTo(W - 170, pad.t + 30); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#4fc3f7'; ctx.fillText('Normal (Z)', W - 165, pad.t + 35);
+
+  ctx.fillStyle = '#eee'; ctx.font = 'bold 14px Segoe UI'; ctx.textAlign = 'center';
+  ctx.fillText('t-Distribution vs. Standard Normal', W / 2, pad.t - 15);
+
+  // p-value comparison at Z=2
+  const pNorm2 = 2 * (1 - pnorm(2));
+  const pT2 = 2 * pt(-2, df);
+  document.getElementById('tDistResult').innerHTML =
+    `<b>df = ${df}</b><br>` +
+    `At |Z| = 2: Normal p = ${pNorm2.toFixed(4)}, t(${df}) p = ${pT2.toFixed(4)}<br>` +
+    `The t-distribution is <b>${df < 30 ? 'notably wider' : 'very close to normal'}</b> at df = ${df}.` +
+    (df < 30 ? ' You need more extreme values to achieve significance!' : '');
+}
+
+// Broken Z-test demo
+function runBrokenZ() {
+  const n = +document.getElementById('brokenN').value;
+  const trials = +document.getElementById('brokenTrials').value;
+  const mu = 100, sigma = 12;
+  const pBroken = [], pFixed = [];
+
+  for (let i = 0; i < trials; i++) {
+    const sample = [];
+    for (let j = 0; j < n; j++) sample.push(rnormMuSd(mu, sigma));
+    const sampleSD = sd(sample);
+    const se = sampleSD / Math.sqrt(n);
+    const z = -Math.abs((mean(sample) - mu) / se);
+
+    pBroken.push(2 * pnorm(z));     // Wrong: using pnorm with estimated SD
+    pFixed.push(2 * pt(z, n - 1));   // Right: using pt with df = n-1
+  }
+
+  const ctx1 = getCtx('brokenZCanvas');
+  drawHistogram(ctx1, pBroken, 50, 'rgba(233,69,96,0.7)',
+    'BROKEN: Z-test with estimated SD (too many small p-values!)', 'P-value', 0, 1);
+
+  const ctx2 = getCtx('fixedTCanvas');
+  drawHistogram(ctx2, pFixed, 50, 'rgba(46,204,113,0.7)',
+    'FIXED: t-test with estimated SD (uniform — correct!)', 'P-value', 0, 1);
+
+  document.getElementById('brokenResult').innerHTML =
+    `<b>${trials} trials</b>, n = ${n}, true μ = ${mu}, σ = ${sigma} (but estimated from sample)<br>` +
+    `<span class="sig">Top:</span> Using pnorm → too many false positives (p < 0.05 rate: ${(pBroken.filter(p=>p<0.05).length/trials*100).toFixed(1)}% vs expected 5%)<br>` +
+    `<span class="ns">Bottom:</span> Using pt(df=${n-1}) → correct (p < 0.05 rate: ${(pFixed.filter(p=>p<0.05).length/trials*100).toFixed(1)}%)`;
+}
+
+
+// ===== T-TEST =====
+function runTTest() {
+  const mu1 = +document.getElementById('ttMu1').value;
+  const mu2 = +document.getElementById('ttMu2').value;
+  const sigma = +document.getElementById('ttSD').value;
+  const n = +document.getElementById('ttN').value;
+
+  // Generate samples
+  const g1 = [], g2 = [];
+  for (let i = 0; i < n; i++) {
+    g1.push(rnormMuSd(mu1, sigma));
+    g2.push(rnormMuSd(mu2, sigma));
+  }
+
+  const m1 = mean(g1), m2 = mean(g2);
+  const s1 = variance(g1), s2 = variance(g2);
+  const sp2 = ((n-1)*s1 + (n-1)*s2) / (2*n - 2); // pooled variance
+  const se = Math.sqrt(sp2 * (1/n + 1/n));
+  const tStat = (m1 - m2) / se;
+  const df = 2 * n - 2;
+  const pVal = 2 * pt(-Math.abs(tStat), df);
+
+  // Draw strip chart
+  const ctx = getCtx('ttCanvas');
+  const W = ctx.canvas.width, H = ctx.canvas.height;
+  const pad = { l: 80, r: 20, t: 50, b: 50 };
+  const plotW = W - pad.l - pad.r, plotH = H - pad.t - pad.b;
+
+  const allVals = [...g1, ...g2];
+  const lo = Math.min(...allVals) - 2, hi = Math.max(...allVals) + 2;
+
+  function xToP(x) { return pad.l + ((x - lo) / (hi - lo)) * plotW; }
+
+  // x-axis
+  ctx.strokeStyle = '#555'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(pad.l, H - pad.b); ctx.lineTo(W - pad.r, H - pad.b); ctx.stroke();
+
+  const y1 = pad.t + plotH * 0.3, y2 = pad.t + plotH * 0.7;
+
+  // Group 1 points
+  ctx.fillStyle = 'rgba(233,69,96,0.6)';
+  for (const v of g1) {
+    ctx.beginPath();
+    ctx.arc(xToP(v), y1 + (Math.random()-0.5)*20, 4, 0, 2*Math.PI);
+    ctx.fill();
+  }
+  // Group 1 mean
+  ctx.strokeStyle = '#e94560'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(xToP(m1), y1 - 25); ctx.lineTo(xToP(m1), y1 + 25); ctx.stroke();
+
+  // Group 2 points
+  ctx.fillStyle = 'rgba(79,195,247,0.6)';
+  for (const v of g2) {
+    ctx.beginPath();
+    ctx.arc(xToP(v), y2 + (Math.random()-0.5)*20, 4, 0, 2*Math.PI);
+    ctx.fill();
+  }
+  // Group 2 mean
+  ctx.strokeStyle = '#4fc3f7'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(xToP(m2), y2 - 25); ctx.lineTo(xToP(m2), y2 + 25); ctx.stroke();
+
+  // Labels
+  ctx.fillStyle = '#e94560'; ctx.font = 'bold 13px Segoe UI'; ctx.textAlign = 'right';
+  ctx.fillText('Music', pad.l - 10, y1 + 5);
+  ctx.fillStyle = '#4fc3f7';
+  ctx.fillText('No music', pad.l - 10, y2 + 5);
+
+  // x-axis labels
+  ctx.fillStyle = '#aab'; ctx.font = '11px Segoe UI'; ctx.textAlign = 'center';
+  const step = Math.max(1, Math.round((hi - lo) / 10));
+  for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) {
+    ctx.fillText(v.toFixed(0), xToP(v), H - pad.b + 18);
+  }
+  ctx.fillText('Test Score', W / 2, H - 5);
+
+  ctx.fillStyle = '#eee'; ctx.font = 'bold 14px Segoe UI'; ctx.textAlign = 'center';
+  ctx.fillText('Two-Sample t-Test: Music vs. No Music', W / 2, pad.t - 15);
+
+  const sig = pVal < 0.05;
+  document.getElementById('ttResult').innerHTML =
+    `<b>Music group:</b> n=${n}, mean=${m1.toFixed(1)}, sd=${Math.sqrt(s1).toFixed(1)} &nbsp; | &nbsp; ` +
+    `<b>No-music group:</b> n=${n}, mean=${m2.toFixed(1)}, sd=${Math.sqrt(s2).toFixed(1)}<br>` +
+    `<b>Pooled SE:</b> ${se.toFixed(2)} &nbsp; | &nbsp; <b>t = ${tStat.toFixed(3)}</b> &nbsp; | &nbsp; <b>df = ${df}</b><br>` +
+    `<b>Two-sided p-value:</b> <span class="${sig?'sig':'ns'}">${pVal < 0.0001 ? pVal.toExponential(3) : pVal.toFixed(4)}</span><br>` +
+    `<b>Verdict:</b> ${sig ? '🎵 Significant difference! Music might help!' : '✅ No significant difference detected.'}` +
+    ` <i>(Try clicking again — each click is a new random sample!)</i>`;
+}
+
+// t-test sanity check
+function runTTestSanity() {
+  const n = +document.getElementById('ttSanN').value;
+  const trials = +document.getElementById('ttSanTrials').value;
+  const mu = 75, sigma = 10;
+  const pvals = [];
+  for (let i = 0; i < trials; i++) {
+    const g1 = [], g2 = [];
+    for (let j = 0; j < n; j++) { g1.push(rnormMuSd(mu, sigma)); g2.push(rnormMuSd(mu, sigma)); }
+    const m1 = mean(g1), m2 = mean(g2);
+    const s1 = variance(g1), s2 = variance(g2);
+    const sp2 = ((n-1)*s1 + (n-1)*s2) / (2*n - 2);
+    const se = Math.sqrt(sp2 * (1/n + 1/n));
+    const t = -Math.abs((m1 - m2) / se);
+    pvals.push(2 * pt(t, 2*n - 2));
+  }
+  const ctx = getCtx('ttSanCanvas');
+  drawHistogram(ctx, pvals, 50, 'rgba(155,89,182,0.7)',
+    't-Test P-values Under H₀ (equal means → should be uniform)', 'P-value', 0, 1);
+  document.getElementById('ttSanResult').innerHTML =
+    `<b>${trials} trials</b>, n=${n} per group, same μ=${mu}, σ=${sigma}. ` +
+    `Mean p = ${mean(pvals).toFixed(3)}. P < 0.05 rate: ${(pvals.filter(p=>p<0.05).length/trials*100).toFixed(1)}% (expect ~5%).`;
+}
+
+// Unequal variance demo
+function runUnequalVar() {
+  const sd1 = +document.getElementById('uvSD1').value;
+  const sd2 = +document.getElementById('uvSD2').value;
+  const n = +document.getElementById('uvN').value;
+  const trials = 10000;
+  const mu = 75;
+  const pvals = [];
+  for (let i = 0; i < trials; i++) {
+    const g1 = [], g2 = [];
+    for (let j = 0; j < n; j++) { g1.push(rnormMuSd(mu, sd1)); g2.push(rnormMuSd(mu, sd2)); }
+    const m1 = mean(g1), m2 = mean(g2);
+    const s1 = variance(g1), s2 = variance(g2);
+    const sp2 = ((n-1)*s1 + (n-1)*s2) / (2*n - 2);
+    const se = Math.sqrt(sp2 * (1/n + 1/n));
+    const t = -Math.abs((m1 - m2) / se);
+    pvals.push(2 * pt(t, 2*n - 2));
+  }
+  const ctx = getCtx('uvCanvas');
+  drawHistogram(ctx, pvals, 50, 'rgba(243,156,18,0.7)',
+    `Standard t-Test P-values with Unequal Variance (σ₁=${sd1}, σ₂=${sd2})`, 'P-value', 0, 1);
+  const fp = pvals.filter(p => p < 0.05).length / trials * 100;
+  document.getElementById('uvResult').innerHTML =
+    `<b>${trials} trials</b>, n=${n}, same μ=${mu}, σ₁=${sd1}, σ₂=${sd2}<br>` +
+    `P < 0.05 rate: <span class="${fp > 7 ? 'sig' : 'ns'}">${fp.toFixed(1)}%</span> (expect 5%)<br>` +
+    (Math.abs(sd1-sd2) > 5 ? 'The distribution is NOT uniform — the equal-variance t-test is unreliable here! In R, use <code>t.test(x, y, var.equal=FALSE)</code> for Welch\'s correction.' :
+    'With similar variances, the test holds up well.');
+}
+
+// Init
+drawSE();
+</script>
+</body>
+</html>
