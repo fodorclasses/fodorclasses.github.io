@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lecture 13 Explorer — t-tests, Normality, Wilcoxon & Linear Regression</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --card: #16213e;
+    --accent: #0f3460;
+    --highlight: #e94560;
+    --text: #eee;
+    --muted: #aab;
+    --success: #2ecc71;
+    --warn: #f39c12;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+  }
+  header {
+    background: linear-gradient(135deg, var(--accent), var(--card));
+    padding: 2rem;
+    text-align: center;
+    border-bottom: 3px solid var(--highlight);
+  }
+  header h1 { font-size: 2rem; margin-bottom: 0.3rem; }
+  header p { color: var(--muted); font-size: 1rem; }
+  nav {
+    display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem;
+    padding: 1rem; background: var(--card);
+    position: sticky; top: 0; z-index: 100;
+    border-bottom: 1px solid #333;
+  }
+  nav button {
+    background: var(--accent); color: var(--text); border: none;
+    padding: 0.5rem 1.2rem; border-radius: 20px; cursor: pointer;
+    font-size: 0.9rem; transition: all 0.2s;
+  }
+  nav button:hover, nav button.active {
+    background: var(--highlight); transform: scale(1.05);
+  }
+  .section { display: none; max-width: 1050px; margin: 2rem auto; padding: 0 1rem; }
+  .section.active { display: block; }
+  .card {
+    background: var(--card); border-radius: 12px; padding: 1.5rem;
+    margin-bottom: 1.5rem; border: 1px solid #2a2a4a;
+  }
+  .card h2 { color: var(--highlight); margin-bottom: 0.5rem; font-size: 1.4rem; }
+  .card h3 { color: var(--warn); margin: 1rem 0 0.5rem; font-size: 1.1rem; }
+  .controls {
+    display: flex; flex-wrap: wrap; gap: 1rem; align-items: center;
+    margin: 1rem 0; padding: 1rem; background: rgba(0,0,0,0.2); border-radius: 8px;
+  }
+  .control-group { display: flex; flex-direction: column; gap: 0.2rem; }
+  .control-group label { font-size: 0.8rem; color: var(--muted); }
+  input[type=range] { width: 150px; accent-color: var(--highlight); }
+  input[type=number] {
+    width: 80px; background: #222; color: var(--text); border: 1px solid #444;
+    padding: 0.3rem; border-radius: 4px; text-align: center;
+  }
+  select {
+    background: #222; color: var(--text); border: 1px solid #444;
+    padding: 0.3rem; border-radius: 4px;
+  }
+  button.run-btn {
+    background: var(--highlight); color: white; border: none;
+    padding: 0.6rem 1.5rem; border-radius: 8px; cursor: pointer;
+    font-size: 1rem; font-weight: bold; transition: all 0.2s;
+  }
+  button.run-btn:hover { transform: scale(1.05); filter: brightness(1.2); }
+  button.run-btn.secondary { background: var(--accent); }
+  canvas {
+    width: 100%; max-width: 800px; display: block;
+    margin: 1rem auto; border-radius: 8px; background: #111;
+  }
+  .result-box {
+    background: rgba(0,0,0,0.3); padding: 1rem; border-radius: 8px;
+    margin-top: 1rem; font-family: 'Consolas', monospace; font-size: 0.95rem;
+    border-left: 3px solid var(--highlight);
+  }
+  .explanation {
+    background: rgba(46,204,113,0.1); border: 1px solid rgba(46,204,113,0.3);
+    padding: 1rem; border-radius: 8px; margin-top: 1rem;
+  }
+  .explanation strong { color: var(--success); }
+  .sig { color: var(--highlight); font-weight: bold; }
+  .ns { color: var(--success); }
+  code { background: rgba(255,255,255,0.1); padding: 0.1em 0.4em; border-radius: 3px; font-size: 0.9em; }
+  table { border-collapse: collapse; margin: 1rem 0; }
+  th, td { border: 1px solid #444; padding: 0.4rem 0.8rem; text-align: center; }
+  th { background: var(--accent); }
+  .two-canvas { display: flex; flex-wrap: wrap; gap: 1rem; justify-content: center; }
+  .two-canvas canvas { max-width: 390px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Lecture 13 Explorer</h1>
+  <p>t-tests (equal/unequal/paired), Normality Testing, Wilcoxon, &amp; Linear Regression</p>
+</header>
+
+<nav>
+  <button class="active" onclick="showSection('welch')">Welch vs Equal Var</button>
+  <button onclick="showSection('paired')">Paired t-test</button>
+  <button onclick="showSection('normality')">Normality Testing</button>
+  <button onclick="showSection('wilcoxon')">Wilcoxon Test</button>
+  <button onclick="showSection('regression')">Linear Regression</button>
+</nav>
+
+<!-- ==================== WELCH VS EQUAL VARIANCE ==================== -->
+<div id="welch" class="section active">
+  <div class="card">
+    <h2>Equal Variance vs Welch's t-test</h2>
+    <p>The standard t-test assumes equal variance. <strong>Welch's t-test</strong> does not &mdash; and has virtually no power penalty. As the lecture says: <em>"There is no reason not to use it."</em></p>
+
+    <div class="controls">
+      <div class="control-group">
+        <label>Group 1 SD: <span id="wSD1Val">10</span></label>
+        <input type="range" id="wSD1" min="1" max="50" value="10" oninput="document.getElementById('wSD1Val').textContent=this.value">
+      </div>
+      <div class="control-group">
+        <label>Group 2 SD: <span id="wSD2Val">30</span></label>
+        <input type="range" id="wSD2" min="1" max="50" value="30" oninput="document.getElementById('wSD2Val').textContent=this.value">
+      </div>
+      <div class="control-group">
+        <label>n per group: <span id="wNVal">10</span></label>
+        <input type="range" id="wN" min="3" max="50" value="10" oninput="document.getElementById('wNVal').textContent=this.value">
+      </div>
+      <div class="control-group">
+        <label>Trials: <span id="wTrialsVal">10000</span></label>
+        <input type="range" id="wTrials" min="1000" max="20000" value="10000" step="1000" oninput="document.getElementById('wTrialsVal').textContent=this.value">
+      </div>
+      <button class="run-btn" onclick="runWelch()">Compare!</button>
+    </div>
+
+    <div class="two-canvas">
+      <canvas id="welchCanvas1" width="390" height="280"></canvas>
+      <canvas id="welchCanvas2" width="390" height="280"></canvas>
+    </div>
+    <div id="welchResult" class="result-box">Click Compare to see both tests under H0 (same means, unequal variance)</div>
+
+    <div class="explanation">
+      <strong>Key insight:</strong> When variances are equal, both tests perform identically. When variances differ, the equal-variance t-test gives incorrect p-values (too many false positives), while Welch's remains correct. R defaults to <code>var.equal=FALSE</code> for this reason.
+    </div>
+  </div>
+</div>
+
+<!-- ==================== PAIRED T-TEST ==================== -->
+<div id="paired" class="section">
+  <div class="card">
+    <h2>Paired t-test &mdash; The Power of Pairing</h2>
+    <p>When each subject is measured before and after treatment, pairing removes between-subject variability. The test becomes: <em>is the mean of the <strong>differences</strong> different from zero?</em></p>
+
+    <h3>Mouse Weight Example (from lecture)</h3>
+    <table>
+      <tr><th>Mouse</th><th>Before</th><th>After</th><th>Diff (B-A)</th></tr>
+      <tr><td>1</td><td>32.2</td><td>28.3</td><td>3.9</td></tr>
+      <tr><td>2</td><td>40.3</td><td>27.2</td><td>13.1</td></tr>
+      <tr><td>3</td><td>12.1</td><td>11.4</td><td>0.7</td></tr>
+      <tr><td>4</td><td>14.4</td><td>13.9</td><td>0.5</td></tr>
+    </table>
+
+    <div class="controls">
+      <div class="control-group">
+        <label>True treatment effect: <span id="pEffVal">3</span></label>
+        <input type="range" id="pEff" min="0" max="20" value="3" oninput="document.getElementById('pEffVal').textContent=this.value">
+      </div>
+      <div class="control-group">
+        <label>Between-subject SD: <span id="pBetweenVal">15</span></label>
+        <input type="range" id="pBetween" min="1" max="40" value="15" oninput="document.getElementById('pBetweenVal').textContent=this.value">
+      </div>
+      <div class="control-group">
+        <label>Within-subject SD: <span id="pWithinVal">3</span></label>
+        <input type="range" id="pWithin" min="1" max="20" value="3" oninput="document.getElementById('pWithinVal').textContent=this.value">
+      </div>
+      <div class="control-group">
+        <label>n subjects: <span id="pNVal">10</span></label>
+        <input type="range" id="pN" min="3" max="50" value="10" oninput="document.getElementById('pNVal').textContent=this.value">
+      </div>
+      <button class="run-btn" onclick="runPaired()">Simulate 5000 trials</button>
+    </div>
+
+    <div class="two-canvas">
+      <canvas id="pairedCanvas1" width="390" height="280"></canvas>
+      <canvas id="pairedCanvas2" width="390" height="280"></canvas>
+    </div>
+    <div id="pairedResult" class="result-box">Click Simulate to compare paired vs unpaired power</div>
+
+    <div class="explanation">
+      <strong>Why pairing works:</strong> Subjects vary enormously (a mouse weighing 40g vs 12g), but each individual's <em>change</em> is consistent. By testing the differences, we remove the huge between-subject variability, leaving only the small within-subject noise. Try setting between-subject SD high and within-subject SD low to see the dramatic power gain.
+    </div>
+  </div>
+</div>
+
+<!-- ==================== NORMALITY TESTING ==================== -->
+<div id="normality" class="section">
+  <div class="card">
+    <h2>Is Your Data Normal? &mdash; QQ Plots &amp; the KS Test</h2>
+    <p>The t-test assumes normality. We can check this visually with a <strong>QQ plot</strong> and formally with the <strong>Kolmogorov-Smirnov test</strong>.</p>
+
+    <div class="controls">
+      <div class="control-group">
+        <label>Distribution:</label>
+        <select id="qqDist" onchange="runQQ()">
+          <option value="normal">Normal</option>
+          <option value="skewed">Skewed (Exponential)</option>
+          <option value="heavy">Heavy-tailed (t, df=3)</option>
+          <option value="bimodal">Bimodal (mixture)</option>
+          <option value="uniform">Uniform</option>
+          <option value="eruptions">Old Faithful eruptions (>3 min)</option>
+        </select>
+      </div>
+      <div class="control-group">
+        <label>Sample size: <span id="qqNVal">100</span></label>
+        <input type="range" id="qqN" min="10" max="500" value="100" oninput="document.getElementById('qqNVal').textContent=this.value">
+      </div>
+      <button class="run-btn" onclick="runQQ()">Generate!</button>
+    </div>
+
+    <div class="two-canvas">
+      <canvas id="qqHistCanvas" width="390" height="300"></canvas>
+      <canvas id="qqPlotCanvas" width="390" height="300"></canvas>
+    </div>
+    <div id="qqResult" class="result-box">Select a distribution and click Generate!</div>
+
+    <div class="explanation">
+      <strong>Reading QQ plots:</strong> If points fall on the diagonal line, the data is approximately normal. S-curves = heavy/light tails. Banana shapes = skewness. The KS test gives a formal p-value: low p = evidence against normality.
+    </div>
+  </div>
+</div>
+
+<!-- ==================== WILCOXON ==================== -->
+<div id="wilcoxon" class="section">
+  <div class="card">
+    <h2>The Wilcoxon Rank-Sum Test &mdash; No Normality Needed</h2>
+    <p>Replace every value with its <strong>rank</strong>, turning an unknown distribution into a known one. Then ask: could we see this separation of ranks by chance?</p>
+
+    <h3>Blue Whales vs Mice (from lecture)</h3>
+    <div class="result-box" style="margin-bottom:1rem">
+      Whales (kg): 108000, 104000, 102000 &rarr; Ranks: <b>4, 5, 6</b><br>
+      Mice (kg): 0.0001, 0.0002, 0.0003 &rarr; Ranks: <b>1, 2, 3</b><br>
+      C(6,3) = 20 possible rank assignments. Only 1 gives ranks {4,5,6} for whales. Two-sided p = 2/20 = <b>0.10</b>
+    </div>
+
+    <div class="controls">
+      <div class="control-group">
+        <label>Distribution:</label>
+        <select id="wilcDist">
+          <option value="normal">Normal</option>
+          <option value="skewed">Skewed (Exponential)</option>
+          <option value="heavy">Heavy-tailed (t, df=3)</option>
+        </select>
+      </div>
+      <div class="control-group">
+        <label>Group 1 shift: <span id="wilcShiftVal">0</span></label>
+        <input type="range" id="wilcShift" min="0" max="10" value="0" step="0.5" oninput="document.getElementById('wilcShiftVal').textContent=this.value">
+      </div>
+      <div class="control-group">
+        <label>n per group: <span id="wilcNVal">15</span></label>
+        <input type="range" id="wilcN" min="5" max="50" value="15" oninput="document.getElementById('wilcNVal').textContent=this.value">
+      </div>
+      <button class="run-btn" onclick="runWilcoxon()">Simulate 5000 trials</button>
+    </div>
+
+    <div class="two-canvas">
+      <canvas id="wilcCanvas1" width="390" height="280"></canvas>
+      <canvas id="wilcCanvas2" width="390" height="280"></canvas>
+    </div>
+    <div id="wilcResult" class="result-box">Click Simulate to compare t-test vs Wilcoxon power</div>
+
+    <div class="explanation">
+      <strong>Trade-off:</strong> The Wilcoxon test makes no distributional assumptions &mdash; great when normality fails. But it has less power than the t-test when data IS normal (especially at small n). For non-normal data, the Wilcoxon can actually be MORE powerful. Try the "Skewed" or "Heavy-tailed" distributions to see this.
+    </div>
+  </div>
+</div>
+
+<!-- ==================== LINEAR REGRESSION ==================== -->
+<div id="regression" class="section">
+  <div class="card">
+    <h2>Linear Regression &mdash; Fitting Y = B0 + B1*X + error</h2>
+    <p>The lecture's example from Neter et al.: fit a line that <strong>minimizes the sum of squared errors</strong>. Click the plot to add/move points!</p>
+
+    <div class="controls">
+      <button class="run-btn" onclick="loadNeterData()">Load Neter Example</button>
+      <button class="run-btn secondary" onclick="loadRandomData()">Random Data</button>
+      <button class="run-btn secondary" onclick="clearRegData()">Clear</button>
+      <div class="control-group">
+        <label>Click canvas to add points</label>
+      </div>
+    </div>
+
+    <canvas id="regCanvas" width="800" height="400" style="cursor:crosshair"></canvas>
+    <div id="regResult" class="result-box">Load data or click on the plot to add points</div>
+  </div>
+
+  <div class="card">
+    <h2>Residual Diagnostics</h2>
+    <p>Check the assumptions: residuals should be normally distributed with constant variance.</p>
+    <div class="two-canvas">
+      <canvas id="residCanvas" width="390" height="300"></canvas>
+      <canvas id="qqResidCanvas" width="390" height="300"></canvas>
+    </div>
+    <div id="residResult" class="result-box">Fit a regression above to see diagnostics</div>
+
+    <div class="explanation">
+      <strong>What to look for:</strong> Left plot (Residuals vs Fitted): no pattern = good; funnel shape = unequal variance; curve = nonlinearity. Right plot (QQ of residuals): points on the line = normality assumption met.
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>ANOVA Decomposition &mdash; Where Does the Variance Go?</h2>
+    <p>Total variation (SSTO) = Explained by regression (SSR) + Unexplained error (SSE). R&sup2; = SSR / SSTO.</p>
+    <canvas id="anovaCanvas" width="800" height="120"></canvas>
+    <div id="anovaResult" class="result-box">Fit a regression to see the decomposition</div>
+  </div>
+</div>
+
+<footer style="text-align:center;padding:2rem;color:var(--muted);font-size:0.85rem;">
+  Lecture 13 Explorer &mdash; Interactive demos for statistical inference
+</footer>
+
+<script>
+// ===== MATH UTILITIES =====
+function rnorm() {
+  let u1 = Math.random(), u2 = Math.random();
+  return Math.sqrt(-2*Math.log(u1))*Math.cos(2*Math.PI*u2);
+}
+function rnormMS(m,s) { return m + s*rnorm(); }
+function mean(a) { return a.reduce((s,x)=>s+x,0)/a.length; }
+function variance(a) { const m=mean(a); return a.reduce((s,x)=>s+(x-m)**2,0)/(a.length-1); }
+function sd(a) { return Math.sqrt(variance(a)); }
+function sum(a) { return a.reduce((s,x)=>s+x,0); }
+
+function dnorm(x,mu=0,sig=1) { const z=(x-mu)/sig; return Math.exp(-0.5*z*z)/(sig*Math.sqrt(2*Math.PI)); }
+function pnorm(x) {
+  const a1=0.254829592,a2=-0.284496736,a3=1.421413741,a4=-1.453152027,a5=1.061405429;
+  const sign=x<0?-1:1; x=Math.abs(x)/Math.SQRT2;
+  const t=1/(1+0.3275911*x);
+  const y=1-(((((a5*t+a4)*t)+a3)*t+a2)*t+a1)*t*Math.exp(-x*x);
+  return 0.5*(1+sign*y);
+}
+function qnorm(p) {
+  // Rational approximation (Beasley-Springer-Moro)
+  if(p<=0) return -Infinity; if(p>=1) return Infinity;
+  if(p===0.5) return 0;
+  const a=[-3.969683028665376e1,2.209460984245205e2,-2.759285104469687e2,
+    1.383577518672690e2,-3.066479806614716e1,2.506628277459239e0];
+  const b=[-5.447609879822406e1,1.615858368580409e2,-1.556989798598866e2,
+    6.680131188771972e1,-1.328068155288572e1];
+  const c=[-7.784894002430293e-3,-3.223964580411365e-1,-2.400758277161838,
+    -2.549732539343734,-4.374664141464968,2.938163982698783];
+  const d=[7.784695709041462e-3,3.224671290700398e-1,2.445134137142996,3.754408661907416];
+  const pLow=0.02425, pHigh=1-pLow;
+  let q,r;
+  if(p<pLow) {
+    q=Math.sqrt(-2*Math.log(p));
+    return (((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5])/((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);
+  } else if(p<=pHigh) {
+    q=p-0.5; r=q*q;
+    return (((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5])*q/(((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1);
+  } else {
+    q=Math.sqrt(-2*Math.log(1-p));
+    return -(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5])/((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);
+  }
+}
+
+function lgamma(x) {
+  const c=[0.99999999999980993,676.5203681218851,-1259.1392167224028,771.32342877765313,
+    -176.61502916214059,12.507343278686905,-0.13857109526572012,9.9843695780195716e-6,1.5056327351493116e-7];
+  if(x<0.5) return Math.log(Math.PI/Math.sin(Math.PI*x))-lgamma(1-x);
+  x-=1; let a=c[0], t=x+7.5;
+  for(let i=1;i<9;i++) a+=c[i]/(x+i);
+  return 0.5*Math.log(2*Math.PI)+(x+0.5)*Math.log(t)-t+Math.log(a);
+}
+function gammaF(z) { return Math.exp(lgamma(z)); }
+
+function pt(x,df) {
+  const t2=x*x;
+  const p=0.5*regBetaI(df/(df+t2),df/2,0.5);
+  return x>=0?1-p:p;
+}
+function regBetaI(x,a,b) {
+  if(x<=0) return 0; if(x>=1) return 1;
+  if(x>(a+1)/(a+b+2)) return 1-regBetaI(1-x,b,a);
+  const lb=lgamma(a)+lgamma(b)-lgamma(a+b);
+  const front=Math.exp(Math.log(x)*a+Math.log(1-x)*b-lb)/a;
+  let f=1,c=1,d=0;
+  for(let i=0;i<=200;i++){
+    let m=Math.floor(i/2), num;
+    if(i===0) num=1;
+    else if(i%2===0) num=m*(b-m)*x/((a+2*m-1)*(a+2*m));
+    else num=-((a+m)*(a+b+m)*x)/((a+2*m)*(a+2*m+1));
+    d=1+num*d; if(Math.abs(d)<1e-30) d=1e-30; d=1/d;
+    c=1+num/c; if(Math.abs(c)<1e-30) c=1e-30;
+    f*=d*c; if(Math.abs(d*c-1)<1e-12) break;
+  }
+  return front*(f-1);
+}
+
+// t-test (equal variance)
+function tTestEqual(g1,g2) {
+  const n1=g1.length, n2=g2.length;
+  const m1=mean(g1), m2=mean(g2);
+  const v1=variance(g1), v2=variance(g2);
+  const sp2=((n1-1)*v1+(n2-1)*v2)/(n1+n2-2);
+  const se=Math.sqrt(sp2*(1/n1+1/n2));
+  const t=(m1-m2)/se;
+  const df=n1+n2-2;
+  return { t, df, p: 2*pt(-Math.abs(t),df) };
+}
+
+// Welch's t-test (unequal variance)
+function tTestWelch(g1,g2) {
+  const n1=g1.length, n2=g2.length;
+  const m1=mean(g1), m2=mean(g2);
+  const v1=variance(g1), v2=variance(g2);
+  const se=Math.sqrt(v1/n1+v2/n2);
+  const t=(m1-m2)/se;
+  const num=(v1/n1+v2/n2)**2;
+  const den=(v1/n1)**2/(n1-1)+(v2/n2)**2/(n2-1);
+  const df=num/den;
+  return { t, df: Math.floor(df), p: 2*pt(-Math.abs(t),Math.floor(df)) };
+}
+
+// Wilcoxon rank-sum (normal approx for large n)
+function wilcoxonTest(g1,g2) {
+  const n1=g1.length, n2=g2.length, N=n1+n2;
+  const all=g1.map((v,i)=>({v,g:0})).concat(g2.map((v,i)=>({v,g:1})));
+  all.sort((a,b)=>a.v-b.v);
+  // Assign ranks (handle ties)
+  let i=0;
+  while(i<N) {
+    let j=i;
+    while(j<N-1 && all[j+1].v===all[j].v) j++;
+    const avgRank=(i+j)/2+1;
+    for(let k=i;k<=j;k++) all[k].rank=avgRank;
+    i=j+1;
+  }
+  const W=all.filter(x=>x.g===0).reduce((s,x)=>s+x.rank,0);
+  const muW=n1*(N+1)/2;
+  const sigW=Math.sqrt(n1*n2*(N+1)/12);
+  const z=(W-muW)/sigW;
+  return { W, z, p: 2*(1-pnorm(Math.abs(z))) };
+}
+
+// KS test (one-sample vs normal)
+function ksTest(data) {
+  const n=data.length, m=mean(data), s=sd(data);
+  const sorted=[...data].sort((a,b)=>a-b);
+  let D=0;
+  for(let i=0;i<n;i++) {
+    const Fn=(i+1)/n;
+    const Fx=pnorm((sorted[i]-m)/s);
+    D=Math.max(D, Math.abs(Fn-Fx), Math.abs((i)/n-Fx));
+  }
+  // Approximate p-value
+  const sqrtN=Math.sqrt(n);
+  const lambda=(sqrtN+0.12+0.11/sqrtN)*D;
+  let p=0;
+  for(let k=1;k<=100;k++) p+=2*(k%2?1:-1)*Math.exp(-2*k*k*lambda*lambda);
+  p=Math.max(0,Math.min(1,p));
+  return { D, p };
+}
+
+// Generate from different distributions
+function genDist(type, n, shift=0) {
+  const arr=[];
+  for(let i=0;i<n;i++) {
+    let v;
+    switch(type) {
+      case 'normal': v=rnorm(); break;
+      case 'skewed': v=-Math.log(1-Math.random()); break; // Exp(1)
+      case 'heavy': { // t with df=3
+        const z=rnorm(), chi=rnorm()**2+rnorm()**2+rnorm()**2;
+        v=z/Math.sqrt(chi/3); break;
+      }
+      case 'bimodal': v=Math.random()<0.5? rnormMS(-2,1): rnormMS(2,1); break;
+      case 'uniform': v=Math.random()*6-3; break;
+      default: v=rnorm();
+    }
+    arr.push(v+shift);
+  }
+  return arr;
+}
+
+// Old Faithful long eruptions
+const eruptionsLong=[3.6,4.0,3.8,3.7,4.1,3.9,4.5,3.6,4.0,3.8,4.2,3.9,4.3,4.1,3.7,
+  4.0,3.8,4.4,3.6,4.2,3.9,4.1,3.7,4.0,3.8,4.3,3.6,4.1,3.9,4.5,3.7,4.0,4.2,3.8,
+  4.1,3.6,3.9,4.0,4.3,3.7,4.2,3.8,4.1,3.9,4.4,3.6,4.0,3.8,4.1,3.7];
+
+
+// ===== DRAWING UTILITIES =====
+function getCtx(id) { const c=document.getElementById(id); c.width=c.width; return c.getContext('2d'); }
+
+function drawHistogram(ctx, data, numBins, color, title, xLabel, lo, hi, overlayFn) {
+  const W=ctx.canvas.width, H=ctx.canvas.height;
+  const pad={l:55,r:15,t:35,b:40};
+  const plotW=W-pad.l-pad.r, plotH=H-pad.t-pad.b;
+  if(lo===undefined) lo=Math.min(...data);
+  if(hi===undefined) hi=Math.max(...data);
+  if(hi===lo) hi=lo+1;
+  const binW=(hi-lo)/numBins;
+  const bins=new Array(numBins).fill(0);
+  for(const v of data){let idx=Math.floor((v-lo)/binW);if(idx>=numBins)idx=numBins-1;if(idx<0)idx=0;bins[idx]++;}
+  const maxBin=Math.max(...bins,1);
+
+  ctx.strokeStyle='#555';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(pad.l,pad.t);ctx.lineTo(pad.l,H-pad.b);ctx.lineTo(W-pad.r,H-pad.b);ctx.stroke();
+
+  ctx.fillStyle=color;
+  for(let i=0;i<numBins;i++){
+    const x=pad.l+(i/numBins)*plotW, w=plotW/numBins-1, h=(bins[i]/maxBin)*plotH;
+    ctx.fillRect(x,H-pad.b-h,w,h);
+  }
+
+  if(overlayFn) {
+    ctx.strokeStyle='#e94560';ctx.lineWidth=2.5;ctx.beginPath();
+    for(let s=0;s<=200;s++){
+      const xVal=lo+(hi-lo)*s/200, density=overlayFn(xVal);
+      const yCount=density*data.length*binW;
+      const px=pad.l+(s/200)*plotW, py=H-pad.b-(yCount/maxBin)*plotH;
+      s===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
+    }
+    ctx.stroke();
+  }
+
+  ctx.fillStyle='#aab';ctx.font='11px Segoe UI';ctx.textAlign='center';
+  for(let i=0;i<=5;i++){const val=lo+(hi-lo)*i/5;ctx.fillText(val.toFixed(2),pad.l+(i/5)*plotW,H-pad.b+15);}
+  ctx.fillStyle='#eee';ctx.font='bold 12px Segoe UI';ctx.fillText(title,W/2,pad.t-10);
+  ctx.fillStyle='#aab';ctx.font='11px Segoe UI';ctx.fillText(xLabel||'',W/2,H-4);
+}
+
+function drawScatter(ctx, xs, ys, color, title, xLabel, yLabel, opts={}) {
+  const W=ctx.canvas.width, H=ctx.canvas.height;
+  const pad={l:55,r:15,t:35,b:40};
+  const plotW=W-pad.l-pad.r, plotH=H-pad.t-pad.b;
+  let xLo=opts.xLo??Math.min(...xs), xHi=opts.xHi??Math.max(...xs);
+  let yLo=opts.yLo??Math.min(...ys), yHi=opts.yHi??Math.max(...ys);
+  const xPad=(xHi-xLo)*0.05||1, yPad=(yHi-yLo)*0.05||1;
+  xLo-=xPad; xHi+=xPad; yLo-=yPad; yHi+=yPad;
+
+  function xToP(x){return pad.l+((x-xLo)/(xHi-xLo))*plotW;}
+  function yToP(y){return H-pad.b-((y-yLo)/(yHi-yLo))*plotH;}
+
+  ctx.strokeStyle='#555';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(pad.l,pad.t);ctx.lineTo(pad.l,H-pad.b);ctx.lineTo(W-pad.r,H-pad.b);ctx.stroke();
+
+  // grid
+  ctx.strokeStyle='#333';ctx.lineWidth=0.5;
+  for(let i=1;i<5;i++){
+    const py=pad.t+i/5*plotH; ctx.beginPath();ctx.moveTo(pad.l,py);ctx.lineTo(W-pad.r,py);ctx.stroke();
+  }
+
+  ctx.fillStyle=color;
+  for(let i=0;i<xs.length;i++){
+    ctx.beginPath(); ctx.arc(xToP(xs[i]),yToP(ys[i]),opts.r||4,0,2*Math.PI); ctx.fill();
+  }
+
+  // Axis labels
+  ctx.fillStyle='#aab';ctx.font='11px Segoe UI';ctx.textAlign='center';
+  for(let i=0;i<=5;i++){const v=xLo+(xHi-xLo)*i/5;ctx.fillText(v.toFixed(1),pad.l+(i/5)*plotW,H-pad.b+15);}
+  ctx.textAlign='right';
+  for(let i=0;i<=4;i++){const v=yLo+(yHi-yLo)*i/4;ctx.fillText(v.toFixed(1),pad.l-5,H-pad.b-i/4*plotH+4);}
+
+  ctx.fillStyle='#eee';ctx.font='bold 12px Segoe UI';ctx.textAlign='center';
+  ctx.fillText(title,W/2,pad.t-10);
+  ctx.fillStyle='#aab';ctx.font='11px Segoe UI';
+  ctx.fillText(xLabel||'',W/2,H-4);
+  ctx.save();ctx.translate(12,H/2);ctx.rotate(-Math.PI/2);ctx.fillText(yLabel||'',0,0);ctx.restore();
+
+  return {xLo,xHi,yLo,yHi,xToP,yToP,pad,plotW,plotH};
+}
+
+
+// ===== SECTION NAVIGATION =====
+function showSection(id) {
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
+  event.target.classList.add('active');
+}
+
+
+// ===== WELCH VS EQUAL VARIANCE =====
+function runWelch() {
+  const sd1=+document.getElementById('wSD1').value;
+  const sd2=+document.getElementById('wSD2').value;
+  const n=+document.getElementById('wN').value;
+  const trials=+document.getElementById('wTrials').value;
+  const mu=50;
+  const pEqual=[],pWelch=[];
+  for(let i=0;i<trials;i++){
+    const g1=[],g2=[];
+    for(let j=0;j<n;j++){g1.push(rnormMS(mu,sd1));g2.push(rnormMS(mu,sd2));}
+    pEqual.push(tTestEqual(g1,g2).p);
+    pWelch.push(tTestWelch(g1,g2).p);
+  }
+  const ctx1=getCtx('welchCanvas1'), ctx2=getCtx('welchCanvas2');
+  drawHistogram(ctx1,pEqual,50,'rgba(220,20,60,0.6)','Equal Variance t-test','P-value',0,1);
+  drawHistogram(ctx2,pWelch,50,'rgba(46,204,113,0.6)','Welch\'s t-test','P-value',0,1);
+
+  const fpEq=pEqual.filter(p=>p<0.05).length/trials*100;
+  const fpW=pWelch.filter(p=>p<0.05).length/trials*100;
+  document.getElementById('welchResult').innerHTML=
+    `<b>${trials} trials</b>, same mean (H0 true), SD1=${sd1}, SD2=${sd2}, n=${n}<br>`+
+    `<span class="${fpEq>7?'sig':'ns'}">Equal-var t-test: P&lt;0.05 rate = ${fpEq.toFixed(1)}%</span> `+
+    `&nbsp;|&nbsp; <span class="ns">Welch's t-test: P&lt;0.05 rate = ${fpW.toFixed(1)}%</span><br>`+
+    `(expect 5%). ${Math.abs(sd1-sd2)>5?'<b>The equal-variance test gives wrong results!</b>':'Both perform similarly with equal variances.'}`;
+}
+
+
+// ===== PAIRED T-TEST =====
+function runPaired() {
+  const effect=+document.getElementById('pEff').value;
+  const betweenSD=+document.getElementById('pBetween').value;
+  const withinSD=+document.getElementById('pWithin').value;
+  const n=+document.getElementById('pN').value;
+  const trials=5000;
+  const pUnpaired=[],pPaired=[];
+
+  for(let i=0;i<trials;i++){
+    const before=[],after=[],diffs=[];
+    for(let j=0;j<n;j++){
+      const base=rnormMS(50,betweenSD);
+      const b=base+rnormMS(0,withinSD);
+      const a=base-effect+rnormMS(0,withinSD);
+      before.push(b); after.push(a); diffs.push(b-a);
+    }
+    // Unpaired: treat as independent groups
+    pUnpaired.push(tTestWelch(before,after).p);
+    // Paired: one-sample t-test on differences
+    const mD=mean(diffs), seD=sd(diffs)/Math.sqrt(n);
+    const tD=mD/seD;
+    pPaired.push(2*pt(-Math.abs(tD),n-1));
+  }
+
+  const ctx1=getCtx('pairedCanvas1'), ctx2=getCtx('pairedCanvas2');
+  drawHistogram(ctx1,pUnpaired,50,'rgba(220,20,60,0.6)','Unpaired t-test','P-value',0,1);
+  drawHistogram(ctx2,pPaired,50,'rgba(46,204,113,0.6)','Paired t-test','P-value',0,1);
+
+  const pwrU=pUnpaired.filter(p=>p<0.05).length/trials*100;
+  const pwrP=pPaired.filter(p=>p<0.05).length/trials*100;
+  document.getElementById('pairedResult').innerHTML=
+    `<b>${trials} trials</b>, effect=${effect}, between-subject SD=${betweenSD}, within-subject SD=${withinSD}, n=${n}<br>`+
+    `Unpaired power (P&lt;0.05 rate): <b>${pwrU.toFixed(1)}%</b> &nbsp;|&nbsp; Paired power: <b>${pwrP.toFixed(1)}%</b><br>`+
+    (effect>0?`Pairing ${pwrP>pwrU?'dramatically increases':'changes'} power by removing between-subject variability!`
+    :'With effect=0 (H0 true), both should give ~5% false positives.');
+}
+
+
+// ===== NORMALITY TESTING =====
+function runQQ() {
+  const dist=document.getElementById('qqDist').value;
+  const n=+document.getElementById('qqN').value;
+
+  let data;
+  if(dist==='eruptions') data=[...eruptionsLong].slice(0,Math.min(n,eruptionsLong.length));
+  else data=genDist(dist,n);
+
+  // Histogram
+  const ctx1=getCtx('qqHistCanvas');
+  const lo=Math.min(...data), hi=Math.max(...data);
+  const m=mean(data), s=sd(data);
+  drawHistogram(ctx1,data,30,'rgba(79,195,247,0.6)','Histogram + Normal overlay','Value',
+    lo-(hi-lo)*0.05, hi+(hi-lo)*0.05,
+    x=>dnorm(x,m,s));
+
+  // QQ plot
+  const ctx2=getCtx('qqPlotCanvas');
+  const sorted=[...data].sort((a,b)=>a-b);
+  const theoretical=[], observed=[];
+  for(let i=0;i<sorted.length;i++){
+    const p=(i+0.5)/sorted.length;
+    theoretical.push(qnorm(p));
+    observed.push(sorted[i]);
+  }
+  // Standardize observed for comparison
+  const obsStd=observed.map(x=>(x-m)/s);
+
+  const info=drawScatter(ctx2,theoretical,obsStd,'rgba(79,195,247,0.8)','QQ Plot (vs Normal)','Theoretical Quantiles','Sample Quantiles');
+
+  // Draw reference line
+  const cctx=ctx2;
+  cctx.strokeStyle='#e94560';cctx.lineWidth=2;cctx.setLineDash([6,4]);
+  cctx.beginPath();
+  const lineXLo=Math.min(...theoretical)-0.5, lineXHi=Math.max(...theoretical)+0.5;
+  cctx.moveTo(info.xToP(lineXLo),info.yToP(lineXLo));
+  cctx.lineTo(info.xToP(lineXHi),info.yToP(lineXHi));
+  cctx.stroke();cctx.setLineDash([]);
+
+  // KS test
+  const ks=ksTest(data);
+  const sig=ks.p<0.05;
+  document.getElementById('qqResult').innerHTML=
+    `<b>n = ${data.length}</b> &nbsp;|&nbsp; Mean = ${m.toFixed(3)} &nbsp;|&nbsp; SD = ${s.toFixed(3)}<br>`+
+    `<b>KS test:</b> D = ${ks.D.toFixed(4)}, p = <span class="${sig?'sig':'ns'}">${ks.p<0.0001?ks.p.toExponential(3):ks.p.toFixed(4)}</span><br>`+
+    (sig?'Evidence AGAINST normality (p < 0.05)':'No evidence against normality (p >= 0.05)')+
+    `<br><i>Red dashed line on QQ plot = perfect normality. Deviations from line suggest non-normality.</i>`;
+}
+
+
+// ===== WILCOXON =====
+function runWilcoxon() {
+  const dist=document.getElementById('wilcDist').value;
+  const shift=+document.getElementById('wilcShift').value;
+  const n=+document.getElementById('wilcN').value;
+  const trials=5000;
+  const pT=[],pW=[];
+
+  for(let i=0;i<trials;i++){
+    const g1=genDist(dist,n,shift);
+    const g2=genDist(dist,n,0);
+    pT.push(tTestWelch(g1,g2).p);
+    pW.push(wilcoxonTest(g1,g2).p);
+  }
+
+  const ctx1=getCtx('wilcCanvas1'), ctx2=getCtx('wilcCanvas2');
+  drawHistogram(ctx1,pT,50,'rgba(79,195,247,0.6)','Welch t-test','P-value',0,1);
+  drawHistogram(ctx2,pW,50,'rgba(243,156,18,0.6)','Wilcoxon Rank-Sum','P-value',0,1);
+
+  const pwrT=pT.filter(p=>p<0.05).length/trials*100;
+  const pwrW=pW.filter(p=>p<0.05).length/trials*100;
+  document.getElementById('wilcResult').innerHTML=
+    `<b>${trials} trials</b>, dist=${dist}, shift=${shift}, n=${n}<br>`+
+    `t-test power: <b>${pwrT.toFixed(1)}%</b> &nbsp;|&nbsp; Wilcoxon power: <b>${pwrW.toFixed(1)}%</b><br>`+
+    (shift===0?'With no shift (H0 true), both should give ~5%.'
+    :`${pwrT>pwrW?'t-test':'Wilcoxon'} has more power for this distribution.`);
+}
+
+
+// ===== LINEAR REGRESSION =====
+let regX=[], regY=[];
+
+function loadNeterData() {
+  regX=[30,20,60,80,40,50,60,30,70,60];
+  regY=[73,50,128,170,87,108,135,69,148,132];
+  fitAndDraw();
+}
+
+function loadRandomData() {
+  const n=20;
+  const b0=10+Math.random()*30, b1=1+Math.random()*3;
+  regX=[]; regY=[];
+  for(let i=0;i<n;i++){
+    const x=10+Math.random()*80;
+    regX.push(x);
+    regY.push(b0+b1*x+rnormMS(0,10));
+  }
+  fitAndDraw();
+}
+
+function clearRegData() {
+  regX=[]; regY=[];
+  [getCtx('regCanvas'),getCtx('residCanvas'),getCtx('qqResidCanvas'),getCtx('anovaCanvas')].forEach(c=>{});
+  // clear canvases
+  for(const id of ['regCanvas','residCanvas','qqResidCanvas','anovaCanvas']){
+    const c=document.getElementById(id); c.width=c.width;
+  }
+  document.getElementById('regResult').innerHTML='Click on the plot to add points, or load data.';
+  document.getElementById('residResult').innerHTML='';
+  document.getElementById('anovaResult').innerHTML='';
+}
+
+// Click to add points
+document.addEventListener('DOMContentLoaded',()=>{
+  const rc=document.getElementById('regCanvas');
+  rc.addEventListener('click',(e)=>{
+    const rect=rc.getBoundingClientRect();
+    const scaleX=rc.width/rect.width, scaleY=rc.height/rect.height;
+    const px=(e.clientX-rect.left)*scaleX, py=(e.clientY-rect.top)*scaleY;
+    const pad={l:55,r:15,t:35,b:40};
+    const plotW=rc.width-pad.l-pad.r, plotH=rc.height-pad.t-pad.b;
+
+    // Determine axis range
+    let xLo=0,xHi=100,yLo=0,yHi=200;
+    if(regX.length>0){
+      xLo=Math.min(...regX)-10; xHi=Math.max(...regX)+10;
+      yLo=Math.min(...regY)-10; yHi=Math.max(...regY)+10;
+    }
+    const x=xLo+(px-pad.l)/plotW*(xHi-xLo);
+    const y=yHi-(py-pad.t)/plotH*(yHi-yLo);
+
+    if(px>=pad.l && px<=rc.width-pad.r && py>=pad.t && py<=rc.height-pad.b){
+      regX.push(x); regY.push(y);
+      fitAndDraw();
+    }
+  });
+});
+
+function fitAndDraw() {
+  const n=regX.length;
+  if(n<2){
+    const ctx=getCtx('regCanvas');
+    drawScatter(ctx,regX,regY,'rgba(79,195,247,0.8)','Linear Regression (click to add points)','X','Y');
+    document.getElementById('regResult').innerHTML='Add at least 2 points to fit a line.';
+    return;
+  }
+
+  // Fit: B1 = sum((xi-xbar)(yi-ybar)) / sum((xi-xbar)^2)
+  const xbar=mean(regX), ybar=mean(regY);
+  let num=0, den=0;
+  for(let i=0;i<n;i++){ num+=(regX[i]-xbar)*(regY[i]-ybar); den+=(regX[i]-xbar)**2; }
+  const b1=den>0?num/den:0;
+  const b0=ybar-b1*xbar;
+
+  // Residuals, SSE, SSR, SSTO
+  const yhat=regX.map(x=>b0+b1*x);
+  const resid=regY.map((y,i)=>y-yhat[i]);
+  const SSE=resid.reduce((s,e)=>s+e*e,0);
+  const SSR=yhat.reduce((s,yh)=>s+(yh-ybar)**2,0);
+  const SSTO=regY.reduce((s,y)=>s+(y-ybar)**2,0);
+  const R2=SSTO>0?SSR/SSTO:0;
+  const MSE=n>2?SSE/(n-2):0;
+  const RMSE=Math.sqrt(MSE);
+
+  // Inference on slope
+  const sB1=den>0?Math.sqrt(MSE/den):0;
+  const tB1=sB1>0?b1/sB1:0;
+  const pB1=n>2?2*pt(-Math.abs(tB1),n-2):1;
+
+  // Draw scatter + line
+  const ctx=getCtx('regCanvas');
+  const W=ctx.canvas.width, H=ctx.canvas.height;
+  const pad={l:55,r:15,t:35,b:40};
+  const plotW=W-pad.l-pad.r, plotH=H-pad.t-pad.b;
+  const xLo=Math.min(...regX)-5, xHi=Math.max(...regX)+5;
+  const yLo=Math.min(...regY.concat(yhat))-5, yHi=Math.max(...regY.concat(yhat))+5;
+
+  const info=drawScatter(ctx,regX,regY,'rgba(79,195,247,0.8)',
+    `Y = ${b0.toFixed(1)} + ${b1.toFixed(3)}X  (R² = ${R2.toFixed(4)})`,
+    'X','Y',{xLo,xHi,yLo,yHi});
+
+  // Regression line
+  ctx.strokeStyle='#e94560';ctx.lineWidth=2.5;
+  ctx.beginPath();
+  ctx.moveTo(info.xToP(xLo),info.yToP(b0+b1*xLo));
+  ctx.lineTo(info.xToP(xHi),info.yToP(b0+b1*xHi));
+  ctx.stroke();
+
+  // Draw residual lines
+  ctx.strokeStyle='rgba(243,156,18,0.4)';ctx.lineWidth=1;
+  for(let i=0;i<n;i++){
+    ctx.beginPath();
+    ctx.moveTo(info.xToP(regX[i]),info.yToP(regY[i]));
+    ctx.lineTo(info.xToP(regX[i]),info.yToP(yhat[i]));
+    ctx.stroke();
+  }
+
+  // Result
+  const sigSlope=pB1<0.05;
+  document.getElementById('regResult').innerHTML=
+    `<b>n = ${n}</b> &nbsp;|&nbsp; B0 (intercept) = ${b0.toFixed(3)} &nbsp;|&nbsp; B1 (slope) = ${b1.toFixed(4)}<br>`+
+    `<b>MSE</b> = ${MSE.toFixed(2)} &nbsp;|&nbsp; <b>RMSE</b> (residual std error) = ${RMSE.toFixed(2)}<br>`+
+    `<b>Slope test:</b> t = ${tB1.toFixed(3)}, df = ${n-2}, p = <span class="${sigSlope?'sig':'ns'}">${pB1<0.0001?pB1.toExponential(3):pB1.toFixed(4)}</span><br>`+
+    `<b>R&sup2; = ${R2.toFixed(4)}</b> (${(R2*100).toFixed(1)}% of variance explained)`;
+
+  // ── Residual diagnostics ──
+  // Residuals vs Fitted
+  const ctx2=getCtx('residCanvas');
+  const rInfo=drawScatter(ctx2,yhat,resid,'rgba(243,156,18,0.8)',
+    'Residuals vs Fitted','Fitted values','Residuals');
+  // Zero line
+  ctx2.strokeStyle='rgba(233,69,96,0.6)';ctx2.lineWidth=1.5;ctx2.setLineDash([6,4]);
+  ctx2.beginPath();ctx2.moveTo(rInfo.xToP(rInfo.xLo),rInfo.yToP(0));
+  ctx2.lineTo(rInfo.xToP(rInfo.xHi),rInfo.yToP(0));ctx2.stroke();ctx2.setLineDash([]);
+
+  // QQ of residuals
+  const ctx3=getCtx('qqResidCanvas');
+  const sortedR=[...resid].sort((a,b)=>a-b);
+  const mR=mean(resid), sR=sd(resid);
+  const theo=[], obsStd=[];
+  for(let i=0;i<sortedR.length;i++){
+    theo.push(qnorm((i+0.5)/sortedR.length));
+    obsStd.push(sR>0?(sortedR[i]-mR)/sR:0);
+  }
+  const qqInfo=drawScatter(ctx3,theo,obsStd,'rgba(155,89,182,0.8)','QQ Plot of Residuals','Theoretical','Standardized Residuals');
+  ctx3.strokeStyle='#e94560';ctx3.lineWidth=2;ctx3.setLineDash([6,4]);
+  ctx3.beginPath();
+  const tLo=Math.min(...theo)-0.5, tHi=Math.max(...theo)+0.5;
+  ctx3.moveTo(qqInfo.xToP(tLo),qqInfo.yToP(tLo));
+  ctx3.lineTo(qqInfo.xToP(tHi),qqInfo.yToP(tHi));
+  ctx3.stroke();ctx3.setLineDash([]);
+
+  const ks=ksTest(resid);
+  document.getElementById('residResult').innerHTML=
+    `KS test on residuals: D = ${ks.D.toFixed(4)}, p = ${ks.p<0.0001?ks.p.toExponential(3):ks.p.toFixed(4)}<br>`+
+    (ks.p<0.05?'Residuals may NOT be normal.':'No evidence against normality of residuals.');
+
+  // ── ANOVA bar ──
+  const ctx4=getCtx('anovaCanvas');
+  const AW=ctx4.canvas.width, AH=ctx4.canvas.height;
+  const barY=40, barH=40;
+  const ssrFrac=SSTO>0?SSR/SSTO:0;
+
+  ctx4.fillStyle='#2ecc71';
+  ctx4.fillRect(50,barY,ssrFrac*(AW-100),barH);
+  ctx4.fillStyle='#e94560';
+  ctx4.fillRect(50+ssrFrac*(AW-100),barY,(1-ssrFrac)*(AW-100),barH);
+
+  ctx4.strokeStyle='#eee';ctx4.lineWidth=1;
+  ctx4.strokeRect(50,barY,AW-100,barH);
+
+  ctx4.fillStyle='#eee';ctx4.font='bold 13px Segoe UI';ctx4.textAlign='center';
+  ctx4.fillText('SSTO = SSR + SSE',AW/2,25);
+
+  if(ssrFrac>0.15){
+    ctx4.fillStyle='#111';ctx4.font='bold 12px Segoe UI';
+    ctx4.fillText(`SSR = ${SSR.toFixed(0)}`,50+ssrFrac*(AW-100)/2,barY+barH/2+5);
+  }
+  if(1-ssrFrac>0.15){
+    ctx4.fillStyle='#fff';ctx4.font='bold 12px Segoe UI';
+    ctx4.fillText(`SSE = ${SSE.toFixed(0)}`,50+ssrFrac*(AW-100)+(1-ssrFrac)*(AW-100)/2,barY+barH/2+5);
+  }
+
+  ctx4.fillStyle='#aab';ctx4.font='11px Segoe UI';
+  ctx4.textAlign='left';ctx4.fillText(`SSTO = ${SSTO.toFixed(0)}`,50,barY+barH+20);
+  ctx4.textAlign='center';ctx4.fillText(`R² = SSR/SSTO = ${R2.toFixed(4)}`,AW/2,barY+barH+20);
+
+  document.getElementById('anovaResult').innerHTML=
+    `<span style="color:#2ecc71">SSR (explained)</span> = ${SSR.toFixed(1)} &nbsp;|&nbsp; `+
+    `<span style="color:#e94560">SSE (error)</span> = ${SSE.toFixed(1)} &nbsp;|&nbsp; `+
+    `SSTO = ${SSTO.toFixed(1)} &nbsp;|&nbsp; R&sup2; = ${R2.toFixed(4)}`;
+}
+</script>
+</body>
+</html>
