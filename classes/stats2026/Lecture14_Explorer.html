@@ -1,0 +1,1025 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lecture 14 Explorer — Matrix Regression, F Distribution & ANOVA</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --card: #16213e; --accent: #0f3460;
+    --highlight: #e94560; --text: #eee; --muted: #aab;
+    --success: #2ecc71; --warn: #f39c12;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
+  header { background: linear-gradient(135deg, var(--accent), var(--card)); padding: 2rem; text-align: center; border-bottom: 3px solid var(--highlight); }
+  header h1 { font-size: 2rem; margin-bottom: 0.3rem; }
+  header p { color: var(--muted); font-size: 1rem; }
+  nav { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem; padding: 1rem; background: var(--card); position: sticky; top: 0; z-index: 100; border-bottom: 1px solid #333; }
+  nav button { background: var(--accent); color: var(--text); border: none; padding: 0.5rem 1.2rem; border-radius: 20px; cursor: pointer; font-size: 0.9rem; transition: all 0.2s; }
+  nav button:hover, nav button.active { background: var(--highlight); transform: scale(1.05); }
+  .section { display: none; max-width: 1050px; margin: 2rem auto; padding: 0 1rem; }
+  .section.active { display: block; }
+  .card { background: var(--card); border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; border: 1px solid #2a2a4a; }
+  .card h2 { color: var(--highlight); margin-bottom: 0.5rem; font-size: 1.4rem; }
+  .card h3 { color: var(--warn); margin: 1rem 0 0.5rem; font-size: 1.1rem; }
+  .controls { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; margin: 1rem 0; padding: 1rem; background: rgba(0,0,0,0.2); border-radius: 8px; }
+  .control-group { display: flex; flex-direction: column; gap: 0.2rem; }
+  .control-group label { font-size: 0.8rem; color: var(--muted); }
+  input[type=range] { width: 150px; accent-color: var(--highlight); }
+  button.run-btn { background: var(--highlight); color: white; border: none; padding: 0.6rem 1.5rem; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: bold; transition: all 0.2s; }
+  button.run-btn:hover { transform: scale(1.05); filter: brightness(1.2); }
+  button.run-btn.secondary { background: var(--accent); }
+  canvas { width: 100%; max-width: 800px; display: block; margin: 1rem auto; border-radius: 8px; background: #111; }
+  .result-box { background: rgba(0,0,0,0.3); padding: 1rem; border-radius: 8px; margin-top: 1rem; font-family: 'Consolas', monospace; font-size: 0.95rem; border-left: 3px solid var(--highlight); white-space: pre-wrap; }
+  .explanation { background: rgba(46,204,113,0.1); border: 1px solid rgba(46,204,113,0.3); padding: 1rem; border-radius: 8px; margin-top: 1rem; }
+  .explanation strong { color: var(--success); }
+  .sig { color: var(--highlight); font-weight: bold; }
+  .ns { color: var(--success); }
+  .scenario { font-style: italic; color: var(--warn); margin-bottom: 0.5rem; display: block; }
+  code { background: rgba(255,255,255,0.1); padding: 0.1em 0.4em; border-radius: 3px; font-size: 0.9em; }
+  .two-canvas { display: flex; flex-wrap: wrap; gap: 1rem; justify-content: center; }
+  .two-canvas canvas { max-width: 390px; }
+  .matrix-display { font-family: 'Consolas', monospace; font-size: 0.85rem; background: rgba(0,0,0,0.3); padding: 1rem; border-radius: 8px; overflow-x: auto; margin: 0.5rem 0; line-height: 1.4; }
+  .matrix-display .bracket { color: var(--highlight); }
+  .matrix-display .param { color: var(--warn); font-weight: bold; }
+  .matrix-display .label { color: var(--muted); }
+  .mat-eq { display: flex; align-items: center; flex-wrap: wrap; gap: 0.6rem; padding: 0.5rem 0; }
+  .mat-eq .mat-label { color: var(--muted); font-family: 'Segoe UI', sans-serif; font-size: 0.85rem; font-weight: bold; align-self: flex-start; margin-top: 0.3rem; }
+  .mat-eq .mat-op { font-size: 1.4rem; color: var(--text); font-weight: bold; padding: 0 0.1rem; align-self: center; }
+  .mat-col {
+    display: inline-flex; flex-direction: column; align-items: center;
+    border-left: 2.5px solid var(--highlight); border-right: 2.5px solid var(--highlight);
+    border-radius: 3px; padding: 0.25rem 0.5rem; margin: 0.1rem 0;
+  }
+  .mat-col .mat-cell { font-family: 'Consolas', monospace; font-size: 0.85rem; padding: 0.08rem 0.3rem; white-space: nowrap; text-align: right; }
+  .mat-col .mat-cell.param { color: var(--warn); font-weight: bold; }
+  .mat-col .mat-cell.data { color: var(--text); }
+  .mat-col .mat-cell.resid { color: #aab; }
+  .mat-col-group { display: inline-flex; flex-direction: column; align-items: center; }
+  .mat-col-group .mat-col-title { font-size: 0.75rem; color: var(--muted); margin-bottom: 0.2rem; font-family: 'Segoe UI', sans-serif; }
+  .mat-2col {
+    display: inline-grid; grid-template-columns: auto auto;
+    border-left: 2.5px solid var(--highlight); border-right: 2.5px solid var(--highlight);
+    border-radius: 3px; padding: 0.25rem 0.2rem; margin: 0.1rem 0;
+  }
+  .mat-2col .mat-cell { padding: 0.08rem 0.4rem; }
+  table { border-collapse: collapse; margin: 0.5rem 0; }
+  th, td { border: 1px solid #444; padding: 0.4rem 0.8rem; text-align: center; }
+  th { background: var(--accent); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Lecture 14 Explorer</h1>
+  <p>Matrix Regression, F Distribution, ANOVA for Regression & One-Way ANOVA</p>
+</header>
+
+<nav>
+  <button class="active" onclick="showSection('matrix')">Matrix Regression</button>
+  <button onclick="showSection('fdist')">F Distribution</button>
+  <button onclick="showSection('anova-reg')">ANOVA for Regression</button>
+  <button onclick="showSection('anova-ttest')">ANOVA as t-test</button>
+</nav>
+
+<!-- ==================== MATRIX REGRESSION ==================== -->
+<div id="matrix" class="section active">
+  <div class="card">
+    <h2>Building a Pizza Price Predictor</h2>
+    <span class="scenario">A pizzeria charges based on diameter. You collect data from their menu and want to predict the price of any size. Linear regression finds the best line &mdash; and the matrix form shows you exactly how.</span>
+
+    <div class="controls">
+      <button class="run-btn" onclick="loadPizzaData()">Load Pizza Data</button>
+      <button class="run-btn secondary" onclick="loadPlantData()">Plant Growth Data</button>
+      <button class="run-btn secondary" onclick="loadCustomData()">Random Data</button>
+      <div class="control-group">
+        <label>Add noise: <span id="noiseVal">0</span></label>
+        <input type="range" id="noiseSlider" min="0" max="50" value="0" step="1"
+               oninput="document.getElementById('noiseVal').textContent=this.value; applyNoise()">
+      </div>
+    </div>
+
+    <canvas id="matrixCanvas" width="800" height="350"></canvas>
+
+    <h3>The Matrix Equation: Y = X B + e</h3>
+    <div id="matrixDisplay" class="matrix-display">Load data to see the matrices...</div>
+
+    <h3>Solution: B = (X'X)<sup>-1</sup> X'Y</h3>
+    <div id="matrixSolution" class="matrix-display">...</div>
+
+    <div id="matrixResult" class="result-box">Load a dataset above</div>
+
+    <div class="explanation">
+      <strong>What's happening:</strong> The design matrix X has a column of 1s (for the intercept B0) and a column of x-values (for the slope B1). The magic formula B = (X'X)<sup>-1</sup>X'Y gives us the exact same B0 and B1 we'd get from the formulas, but it generalizes beautifully to multiple predictors. In R: <code>lm(Y ~ X, x=TRUE)</code> stores the design matrix.
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Scramble the Y &mdash; Kill the Signal</h2>
+    <span class="scenario">What happens if you randomly shuffle the response variable? The regression should find... nothing.</span>
+    <div class="controls">
+      <button class="run-btn" onclick="scrambleY()">Scramble Y!</button>
+      <button class="run-btn secondary" onclick="unscrambleY()">Restore Original</button>
+    </div>
+    <canvas id="scrambleCanvas" width="800" height="300"></canvas>
+    <div id="scrambleResult" class="result-box">Load data above first, then scramble!</div>
+
+    <div class="explanation">
+      <strong>From the lecture:</strong> When Y is scrambled, the full model can't explain much more than the reduced model (just the mean). R&sup2; drops near zero, the F-statistic becomes tiny, and the p-value shoots up. The relationship was in the <em>pairing</em> of X and Y &mdash; destroy that and there's nothing left.
+    </div>
+  </div>
+</div>
+
+<!-- ==================== F DISTRIBUTION ==================== -->
+<div id="fdist" class="section">
+  <div class="card">
+    <h2>The F Distribution &mdash; A Ratio of Variances</h2>
+    <span class="scenario">Imagine two factories claiming equal quality control. You sample from each and compute the ratio of their variances. If they're truly equal, this ratio follows an F distribution. Extreme values mean one factory is much more variable than the other.</span>
+    <p>F = (&chi;&sup2;<sub>d1</sub> / d1) / (&chi;&sup2;<sub>d2</sub> / d2) &mdash; a ratio of two independent chi-square variables, each divided by their degrees of freedom.</p>
+
+    <div class="controls">
+      <div class="control-group">
+        <label>df1 (numerator): <span id="fd1Val">5</span></label>
+        <input type="range" id="fd1" min="1" max="30" value="5" oninput="document.getElementById('fd1Val').textContent=this.value">
+      </div>
+      <div class="control-group">
+        <label>df2 (denominator): <span id="fd2Val">20</span></label>
+        <input type="range" id="fd2" min="1" max="60" value="20" oninput="document.getElementById('fd2Val').textContent=this.value">
+      </div>
+      <div class="control-group">
+        <label>Samples: <span id="fTrialsVal">15000</span></label>
+        <input type="range" id="fTrials" min="1000" max="30000" value="15000" step="1000" oninput="document.getElementById('fTrialsVal').textContent=this.value">
+      </div>
+      <button class="run-btn" onclick="runFDist()">Simulate!</button>
+    </div>
+
+    <canvas id="fDistCanvas" width="800" height="350"></canvas>
+    <div id="fDistResult" class="result-box">Click Simulate to build the F distribution from chi-squares!</div>
+
+    <div class="explanation">
+      <strong>Building intuition:</strong> Each simulated F value is literally: generate d1 standard normals, square and sum them, divide by d1; then do the same with d2; take the ratio. The red curve is the theoretical F density. They should match perfectly &mdash; just like the lecture's R demo with <code>rf()</code> and <code>df()</code>.
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Critical Values &mdash; When Is the Ratio "Too Extreme"?</h2>
+    <span class="scenario">In ANOVA, we compute an F-statistic and ask: "Could this ratio have arisen by chance?" The right tail gives the p-value.</span>
+    <div class="controls">
+      <div class="control-group">
+        <label>Your F-statistic: <span id="fCritVal">3.0</span></label>
+        <input type="range" id="fCrit" min="0.1" max="15" value="3.0" step="0.1" oninput="document.getElementById('fCritVal').textContent=this.value; drawFCritical()">
+      </div>
+      <div class="control-group">
+        <label>df1: <span id="fcD1Val">1</span></label>
+        <input type="range" id="fcD1" min="1" max="10" value="1" oninput="document.getElementById('fcD1Val').textContent=this.value; drawFCritical()">
+      </div>
+      <div class="control-group">
+        <label>df2: <span id="fcD2Val">8</span></label>
+        <input type="range" id="fcD2" min="2" max="50" value="8" oninput="document.getElementById('fcD2Val').textContent=this.value; drawFCritical()">
+      </div>
+    </div>
+    <canvas id="fCritCanvas" width="800" height="300"></canvas>
+    <div id="fCritResult" class="result-box">Drag the F-statistic slider to see the p-value change</div>
+  </div>
+</div>
+
+<!-- ==================== ANOVA FOR REGRESSION ==================== -->
+<div id="anova-reg" class="section">
+  <div class="card">
+    <h2>Does Practicing Free Throws Actually Help?</h2>
+    <span class="scenario">A basketball coach tracks how many free throws each player practices per week and their game accuracy. The ANOVA approach asks: does knowing practice hours (full model) predict accuracy significantly better than just guessing the average (reduced model)?</span>
+
+    <div class="controls">
+      <div class="control-group">
+        <label>True slope (improvement/hr): <span id="arSlopeVal">2.5</span></label>
+        <input type="range" id="arSlope" min="0" max="8" value="2.5" step="0.5" oninput="document.getElementById('arSlopeVal').textContent=this.value">
+      </div>
+      <div class="control-group">
+        <label>Noise SD: <span id="arNoiseVal">8</span></label>
+        <input type="range" id="arNoise" min="1" max="25" value="8" oninput="document.getElementById('arNoiseVal').textContent=this.value">
+      </div>
+      <div class="control-group">
+        <label>n players: <span id="arNVal">10</span></label>
+        <input type="range" id="arN" min="5" max="40" value="10" oninput="document.getElementById('arNVal').textContent=this.value">
+      </div>
+      <button class="run-btn" onclick="runAnovaReg()">Generate Data & Analyze</button>
+    </div>
+
+    <canvas id="anovaRegCanvas" width="800" height="380"></canvas>
+
+    <h3>Full vs Reduced Model Comparison</h3>
+    <canvas id="anovaBarCanvas" width="800" height="130"></canvas>
+    <div id="anovaRegTable" class="result-box">Click Generate to see the ANOVA table</div>
+
+    <div class="explanation">
+      <strong>The ANOVA logic:</strong> Reduced model (B1 = 0) says practice doesn't matter &mdash; everyone's accuracy equals the grand mean. Full model (Y = B0 + B1*X) says practice helps. The F-statistic = [(reduced error - full error) / 1] / [full error / (n-2)]. A big F means the full model explains much more than the reduced. Set slope to 0 and see the F drop!
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>What R Shows You &mdash; summary() vs anova()</h2>
+    <div id="rOutputDisplay" class="result-box" style="font-size:0.85rem;">Generate data above to see the breakdown</div>
+    <div class="explanation">
+      <strong>Connection:</strong> For simple regression (one predictor), the ANOVA F-statistic equals t&sup2; (the squared t-statistic from summary). They give exactly the same p-value! R's <code>summary(lm)</code> shows the t-test; <code>anova(lm)</code> shows the F-test. Same answer, different framing.
+    </div>
+  </div>
+</div>
+
+<!-- ==================== ANOVA AS T-TEST ==================== -->
+<div id="anova-ttest" class="section">
+  <div class="card">
+    <h2>Do Dogs or Cats Sleep More? &mdash; t-test vs One-Way ANOVA</h2>
+    <span class="scenario">You track daily sleep hours for a sample of dogs and cats. You could use a t-test OR a one-way ANOVA &mdash; for two groups, they give exactly the same p-value! The ANOVA uses a design matrix with 0s and 1s to encode group membership.</span>
+
+    <div class="controls">
+      <div class="control-group">
+        <label>Dog sleep mean (hrs): <span id="atDogVal">10</span></label>
+        <input type="range" id="atDog" min="6" max="16" value="10" oninput="document.getElementById('atDogVal').textContent=this.value">
+      </div>
+      <div class="control-group">
+        <label>Cat sleep mean (hrs): <span id="atCatVal">14</span></label>
+        <input type="range" id="atCat" min="6" max="20" value="14" oninput="document.getElementById('atCatVal').textContent=this.value">
+      </div>
+      <div class="control-group">
+        <label>SD (both): <span id="atSDVal">2</span></label>
+        <input type="range" id="atSD" min="1" max="6" value="2" step="0.5" oninput="document.getElementById('atSDVal').textContent=this.value">
+      </div>
+      <div class="control-group">
+        <label>n dogs: <span id="atN1Val">5</span></label>
+        <input type="range" id="atN1" min="3" max="20" value="5" oninput="document.getElementById('atN1Val').textContent=this.value">
+      </div>
+      <div class="control-group">
+        <label>n cats: <span id="atN2Val">6</span></label>
+        <input type="range" id="atN2" min="3" max="20" value="6" oninput="document.getElementById('atN2Val').textContent=this.value">
+      </div>
+      <button class="run-btn" onclick="runAnovaTTest()">Generate & Compare</button>
+    </div>
+
+    <canvas id="atCanvas" width="800" height="320"></canvas>
+
+    <h3>The Design Matrix (with "Dog" as background)</h3>
+    <div id="atDesignMatrix" class="matrix-display">Generate data to see the design matrix...</div>
+
+    <h3>Side-by-Side: t-test vs ANOVA</h3>
+    <div id="atComparison" class="result-box">Generate data to compare results</div>
+
+    <div class="explanation">
+      <strong>They're the same test!</strong> For two groups with equal variance: F = t&sup2;, and the p-values are identical. The ANOVA frames it as "does adding a group indicator reduce the error significantly?" while the t-test frames it as "is the difference in means significantly different from zero?" In R: <code>t.test(a, b, var.equal=TRUE)</code> equals <code>anova(lm(y ~ group))</code>. Use <code>relevel()</code> to change which group is "background" &mdash; for two groups it doesn't affect the p-value.
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Proof by Simulation &mdash; F = t&sup2; (Always!)</h2>
+    <span class="scenario">Don't just take our word for it. Run thousands of experiments and plot the t&sup2; values from the t-test against the F values from ANOVA. They should fall on a perfect diagonal line.</span>
+    <div class="controls">
+      <div class="control-group">
+        <label>Trials: <span id="atSimTrialsVal">2000</span></label>
+        <input type="range" id="atSimTrials" min="200" max="5000" value="2000" step="200" oninput="document.getElementById('atSimTrialsVal').textContent=this.value">
+      </div>
+      <button class="run-btn" onclick="runFequalsT2()">Prove It!</button>
+    </div>
+    <canvas id="ft2Canvas" width="600" height="400" style="max-width:600px"></canvas>
+    <div id="ft2Result" class="result-box">Click "Prove It!" to see F = t&sup2;</div>
+  </div>
+</div>
+
+<footer style="text-align:center;padding:2rem;color:var(--muted);font-size:0.85rem;">
+  Lecture 14 Explorer &mdash; Interactive demos for matrix regression, F distribution &amp; ANOVA
+</footer>
+
+<script>
+// ===== MATH UTILITIES =====
+function rnorm(){let u=Math.random(),v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+function rnormMS(m,s){return m+s*rnorm();}
+function mean(a){return a.reduce((s,x)=>s+x,0)/a.length;}
+function variance(a){const m=mean(a);return a.reduce((s,x)=>s+(x-m)**2,0)/(a.length-1);}
+function sd(a){return Math.sqrt(variance(a));}
+
+function lgamma(x){
+  const c=[0.99999999999980993,676.5203681218851,-1259.1392167224028,771.32342877765313,
+    -176.61502916214059,12.507343278686905,-0.13857109526572012,9.9843695780195716e-6,1.5056327351493116e-7];
+  if(x<0.5)return Math.log(Math.PI/Math.sin(Math.PI*x))-lgamma(1-x);
+  x-=1;let a=c[0],t=x+7.5;
+  for(let i=1;i<9;i++)a+=c[i]/(x+i);
+  return 0.5*Math.log(2*Math.PI)+(x+0.5)*Math.log(t)-t+Math.log(a);
+}
+function gammaF(z){return Math.exp(lgamma(z));}
+
+// F distribution PDF
+function dfDist(x,d1,d2){
+  if(x<=0)return 0;
+  const a=d1/2, b=d2/2;
+  return Math.exp(a*Math.log(d1)+b*Math.log(d2)+lgamma(a+b)-lgamma(a)-lgamma(b)
+    +(a-1)*Math.log(x)-(a+b)*Math.log(d1*x+d2));
+}
+
+// F distribution CDF via regularized incomplete beta
+function pfDist(x,d1,d2){
+  if(x<=0)return 0;
+  return regBetaI(d1*x/(d1*x+d2),d1/2,d2/2);
+}
+
+function regBetaI(x,a,b){
+  if(x<=0)return 0;if(x>=1)return 1;
+  if(x>(a+1)/(a+b+2))return 1-regBetaI(1-x,b,a);
+  const lb=lgamma(a)+lgamma(b)-lgamma(a+b);
+  const front=Math.exp(Math.log(x)*a+Math.log(1-x)*b-lb)/a;
+  let f=1,c=1,d=0;
+  for(let i=0;i<=200;i++){
+    let m=Math.floor(i/2),num;
+    if(i===0)num=1;
+    else if(i%2===0)num=m*(b-m)*x/((a+2*m-1)*(a+2*m));
+    else num=-((a+m)*(a+b+m)*x)/((a+2*m)*(a+2*m+1));
+    d=1+num*d;if(Math.abs(d)<1e-30)d=1e-30;d=1/d;
+    c=1+num/c;if(Math.abs(c)<1e-30)c=1e-30;
+    f*=d*c;if(Math.abs(d*c-1)<1e-12)break;
+  }
+  return front*(f-1);
+}
+
+function pt(x,df){
+  const t2=x*x, p=0.5*regBetaI(df/(df+t2),df/2,0.5);
+  return x>=0?1-p:p;
+}
+
+
+// ===== DRAWING UTILITIES =====
+function getCtx(id){const c=document.getElementById(id);c.width=c.width;return c.getContext('2d');}
+
+function drawScatter(ctx,xs,ys,color,title,xLabel,yLabel,opts={}){
+  const W=ctx.canvas.width,H=ctx.canvas.height;
+  const pad={l:55,r:15,t:35,b:40};
+  const plotW=W-pad.l-pad.r, plotH=H-pad.t-pad.b;
+  let xLo=opts.xLo??Math.min(...xs),xHi=opts.xHi??Math.max(...xs);
+  let yLo=opts.yLo??Math.min(...ys),yHi=opts.yHi??Math.max(...ys);
+  const xP=(xHi-xLo)*0.06||1,yP=(yHi-yLo)*0.06||1;
+  xLo-=xP;xHi+=xP;yLo-=yP;yHi+=yP;
+  function xToP(x){return pad.l+((x-xLo)/(xHi-xLo))*plotW;}
+  function yToP(y){return H-pad.b-((y-yLo)/(yHi-yLo))*plotH;}
+
+  ctx.strokeStyle='#555';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(pad.l,pad.t);ctx.lineTo(pad.l,H-pad.b);ctx.lineTo(W-pad.r,H-pad.b);ctx.stroke();
+  ctx.strokeStyle='#2a2a4a';ctx.lineWidth=0.5;
+  for(let i=1;i<5;i++){const py=pad.t+i/5*plotH;ctx.beginPath();ctx.moveTo(pad.l,py);ctx.lineTo(W-pad.r,py);ctx.stroke();}
+
+  ctx.fillStyle=color;
+  for(let i=0;i<xs.length;i++){ctx.beginPath();ctx.arc(xToP(xs[i]),yToP(ys[i]),opts.r||5,0,2*Math.PI);ctx.fill();}
+
+  ctx.fillStyle='#aab';ctx.font='11px Segoe UI';ctx.textAlign='center';
+  for(let i=0;i<=5;i++){const v=xLo+(xHi-xLo)*i/5;ctx.fillText(v.toFixed(1),pad.l+(i/5)*plotW,H-pad.b+15);}
+  ctx.textAlign='right';
+  for(let i=0;i<=4;i++){const v=yLo+(yHi-yLo)*i/4;ctx.fillText(v.toFixed(1),pad.l-5,H-pad.b-i/4*plotH+4);}
+  ctx.fillStyle='#eee';ctx.font='bold 12px Segoe UI';ctx.textAlign='center';
+  ctx.fillText(title,W/2,pad.t-10);
+  ctx.fillStyle='#aab';ctx.font='11px Segoe UI';
+  ctx.fillText(xLabel||'',W/2,H-4);
+  ctx.save();ctx.translate(12,H/2);ctx.rotate(-Math.PI/2);ctx.fillText(yLabel||'',0,0);ctx.restore();
+  return {xLo,xHi,yLo,yHi,xToP,yToP,pad,plotW,plotH};
+}
+
+function drawHistogram(ctx,data,numBins,color,title,xLabel,lo,hi,overlayFn){
+  const W=ctx.canvas.width,H=ctx.canvas.height;
+  const pad={l:55,r:15,t:35,b:40};
+  const plotW=W-pad.l-pad.r,plotH=H-pad.t-pad.b;
+  if(lo===undefined)lo=Math.min(...data);if(hi===undefined)hi=Math.max(...data);
+  if(hi===lo)hi=lo+1;
+  const binW=(hi-lo)/numBins;
+  const bins=new Array(numBins).fill(0);
+  for(const v of data){let idx=Math.floor((v-lo)/binW);if(idx>=numBins)idx=numBins-1;if(idx<0)idx=0;bins[idx]++;}
+  const maxBin=Math.max(...bins,1);
+  ctx.strokeStyle='#555';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(pad.l,pad.t);ctx.lineTo(pad.l,H-pad.b);ctx.lineTo(W-pad.r,H-pad.b);ctx.stroke();
+  ctx.fillStyle=color;
+  for(let i=0;i<numBins;i++){
+    const x=pad.l+(i/numBins)*plotW,w=plotW/numBins-1,h=(bins[i]/maxBin)*plotH;
+    ctx.fillRect(x,H-pad.b-h,w,h);
+  }
+  if(overlayFn){
+    ctx.strokeStyle='#e94560';ctx.lineWidth=2.5;ctx.beginPath();
+    for(let s=0;s<=300;s++){
+      const xVal=lo+(hi-lo)*s/300,density=overlayFn(xVal);
+      const yCount=density*data.length*binW;
+      const px=pad.l+(s/300)*plotW,py=H-pad.b-(yCount/maxBin)*plotH;
+      s===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
+    }
+    ctx.stroke();
+  }
+  ctx.fillStyle='#aab';ctx.font='11px Segoe UI';ctx.textAlign='center';
+  for(let i=0;i<=5;i++){const val=lo+(hi-lo)*i/5;ctx.fillText(val.toFixed(2),pad.l+(i/5)*plotW,H-pad.b+15);}
+  ctx.fillStyle='#eee';ctx.font='bold 12px Segoe UI';ctx.fillText(title,W/2,pad.t-10);
+  ctx.fillStyle='#aab';ctx.font='11px Segoe UI';ctx.fillText(xLabel||'',W/2,H-4);
+}
+
+
+// ===== SECTION NAV =====
+function showSection(id){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
+  event.target.classList.add('active');
+}
+
+
+// ===== REGRESSION HELPERS =====
+function fitLM(X,Y){
+  const n=X.length, xbar=mean(X), ybar=mean(Y);
+  let num=0,den=0;
+  for(let i=0;i<n;i++){num+=(X[i]-xbar)*(Y[i]-ybar);den+=(X[i]-xbar)**2;}
+  const b1=den>0?num/den:0, b0=ybar-b1*xbar;
+  const yhat=X.map(x=>b0+b1*x);
+  const resid=Y.map((y,i)=>y-yhat[i]);
+  const SSE=resid.reduce((s,e)=>s+e*e,0);
+  const SSR=yhat.reduce((s,yh)=>s+(yh-ybar)**2,0);
+  const SSTO=Y.reduce((s,y)=>s+(y-ybar)**2,0);
+  const R2=SSTO>0?SSR/SSTO:0;
+  const MSR=SSR/1;
+  const MSE=n>2?SSE/(n-2):0;
+  const F=MSE>0?MSR/MSE:0;
+  const pF=n>2?1-pfDist(F,1,n-2):1;
+  const sB1=den>0?Math.sqrt(MSE/den):0;
+  const tB1=sB1>0?b1/sB1:0;
+  const pT=n>2?2*pt(-Math.abs(tB1),n-2):1;
+  return {b0,b1,yhat,resid,SSE,SSR,SSTO,R2,MSR,MSE,F,pF,tB1,pT,n};
+}
+
+
+// ===== MATRIX REGRESSION =====
+let matX=[], matY=[], matYorig=[], matYclean=[], matNoiseSeed=[], matXLabel='X', matYLabel='Y';
+
+function initNoiseSeed(n) {
+  matNoiseSeed = [];
+  for(let i=0;i<n;i++) matNoiseSeed.push(rnorm());
+}
+
+function applyNoise() {
+  if(matYclean.length===0) return;
+  const noiseLevel = +document.getElementById('noiseSlider').value;
+  matY = matYclean.map((y,i) => y + matNoiseSeed[i] * noiseLevel);
+  matYorig = [...matY];
+  drawMatrix();
+}
+
+function loadPizzaData(){
+  matX=[8,10,12,14,16,18,20,24];
+  matYclean=[6.50,8.00,10.50,12.00,14.50,17.00,19.00,24.00];
+  initNoiseSeed(matX.length);
+  matY=[...matYclean]; matYorig=[...matY];
+  matXLabel='Diameter (inches)'; matYLabel='Price ($)';
+  document.getElementById('noiseSlider').value=0; document.getElementById('noiseVal').textContent='0';
+  drawMatrix();
+}
+function loadPlantData(){
+  matX=[2,4,6,8,10,12,14,16,18,20];
+  matYclean=[5,10,18,22,28,34,40,45,50,56];
+  initNoiseSeed(matX.length);
+  matY=[...matYclean]; matYorig=[...matY];
+  matXLabel='Sunlight (hours/week)'; matYLabel='Height (cm)';
+  document.getElementById('noiseSlider').value=0; document.getElementById('noiseVal').textContent='0';
+  drawMatrix();
+}
+function loadCustomData(){
+  const n=10;matX=[];matYclean=[];
+  for(let i=0;i<n;i++){matX.push(10+Math.random()*80);matYclean.push(50);}
+  initNoiseSeed(n);
+  matY=[...matYclean]; matYorig=[...matY];
+  matXLabel='X'; matYLabel='Y';
+  document.getElementById('noiseSlider').value=15; document.getElementById('noiseVal').textContent='15';
+  applyNoise();
+}
+
+function drawMatrix(){
+  const n=matX.length;
+  if(n<2)return;
+  const fit=fitLM(matX,matY);
+
+  // Scatter + line
+  const ctx=getCtx('matrixCanvas');
+  const info=drawScatter(ctx,matX,matY,'rgba(79,195,247,0.85)',
+    `${matYLabel} = ${fit.b0.toFixed(2)} + ${fit.b1.toFixed(3)} * ${matXLabel}`,
+    matXLabel,matYLabel);
+
+  ctx.strokeStyle='#e94560';ctx.lineWidth=2.5;
+  ctx.beginPath();
+  ctx.moveTo(info.xToP(info.xLo),info.yToP(fit.b0+fit.b1*info.xLo));
+  ctx.lineTo(info.xToP(info.xHi),info.yToP(fit.b0+fit.b1*info.xHi));
+  ctx.stroke();
+
+  // Residual lines
+  ctx.strokeStyle='rgba(243,156,18,0.35)';ctx.lineWidth=1;
+  for(let i=0;i<n;i++){
+    ctx.beginPath();
+    ctx.moveTo(info.xToP(matX[i]),info.yToP(matY[i]));
+    ctx.lineTo(info.xToP(matX[i]),info.yToP(fit.yhat[i]));
+    ctx.stroke();
+  }
+
+  // Mean line (reduced model)
+  const ybar=mean(matY);
+  ctx.strokeStyle='rgba(155,89,182,0.5)';ctx.lineWidth=1.5;ctx.setLineDash([8,6]);
+  ctx.beginPath();
+  ctx.moveTo(info.xToP(info.xLo),info.yToP(ybar));
+  ctx.lineTo(info.xToP(info.xHi),info.yToP(ybar));
+  ctx.stroke();ctx.setLineDash([]);
+
+  // Legend
+  ctx.font='11px Segoe UI';ctx.textAlign='left';
+  ctx.strokeStyle='#e94560';ctx.lineWidth=2.5;ctx.setLineDash([]);
+  ctx.beginPath();ctx.moveTo(info.pad.l+10,info.pad.l);ctx.lineTo(info.pad.l+30,info.pad.l);ctx.stroke();
+  ctx.fillStyle='#e94560';ctx.fillText('Full model (B0 + B1*X)',info.pad.l+35,info.pad.l+4);
+  ctx.strokeStyle='rgba(155,89,182,0.7)';ctx.lineWidth=1.5;ctx.setLineDash([8,6]);
+  ctx.beginPath();ctx.moveTo(info.pad.l+10,info.pad.l+16);ctx.lineTo(info.pad.l+30,info.pad.l+16);ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle='#9b59b6';ctx.fillText(`Reduced model (just the mean = ${ybar.toFixed(1)})`,info.pad.l+35,info.pad.l+20);
+
+  // Stats overlay on plot (left side, under legend)
+  const sigMain=fit.pF<0.05;
+  const pStr=fit.pF<0.0001?fit.pF.toExponential(2):fit.pF.toFixed(4);
+  ctx.font='bold 13px Consolas';ctx.textAlign='left';
+  ctx.fillStyle=sigMain?'#e94560':'#2ecc71';
+  ctx.fillText(`R\u00B2 = ${fit.R2.toFixed(4)}   F = ${fit.F.toFixed(2)}   p = ${pStr}`,info.pad.l+10,info.pad.l+40);
+  ctx.font='11px Segoe UI';
+  ctx.fillText(sigMain?'significant':'not significant',info.pad.l+10,info.pad.l+56);
+
+  // Display matrices as proper column vectors
+  function matCol(title, values, cls='data') {
+    let cells = values.map(v => `<div class="mat-cell ${cls}">${v}</div>`).join('');
+    return `<div class="mat-col-group"><div class="mat-col-title">${title}</div><div class="mat-col">${cells}</div></div>`;
+  }
+  function mat2Col(title, col1, col2) {
+    let cells = col1.map((v,i) => `<div class="mat-cell data">${v}</div><div class="mat-cell data">${col2[i]}</div>`).join('');
+    return `<div class="mat-col-group"><div class="mat-col-title">${title}</div><div class="mat-2col">${cells}</div></div>`;
+  }
+
+  const yVals = matY.map(v => v.toFixed(1));
+  const xCol1 = matX.map(() => '1');
+  const xCol2 = matX.map(x => x.toFixed(0));
+  const bVals = ['B0', 'B1'];
+  const eVals = fit.resid.map(e => e.toFixed(2));
+
+  document.getElementById('matrixDisplay').innerHTML =
+    `<div class="mat-eq">` +
+    matCol('Y', yVals) +
+    `<span class="mat-op">=</span>` +
+    mat2Col('X', xCol1, xCol2) +
+    `<span class="mat-op">\u00D7</span>` +
+    matCol('B', bVals, 'param') +
+    `<span class="mat-op">+</span>` +
+    matCol('e', eVals, 'resid') +
+    `</div>`;
+
+  // Solution: X'X, X'Y, and B
+  const n2=matX.length;
+  const sumX=matX.reduce((s,x)=>s+x,0);
+  const sumX2=matX.reduce((s,x)=>s+x*x,0);
+  const sumY=matY.reduce((s,y)=>s+y,0);
+  const sumXY=matX.reduce((s,x,i)=>s+x*matY[i],0);
+
+  document.getElementById('matrixSolution').innerHTML =
+    `<div class="mat-eq">` +
+    `<span class="mat-label">X'X =</span>` +
+    mat2Col('', [n2.toString(), sumX.toFixed(0)], [sumX.toFixed(0), sumX2.toFixed(0)]) +
+    `<span style="width:2rem"></span>` +
+    `<span class="mat-label">X'Y =</span>` +
+    matCol('', [sumY.toFixed(1), sumXY.toFixed(1)]) +
+    `</div>` +
+    `<div class="mat-eq" style="margin-top:0.5rem;">` +
+    `<span class="mat-label">B = (X'X)<sup>\u22121</sup> X'Y =</span>` +
+    matCol('', [fit.b0.toFixed(4), fit.b1.toFixed(4)], 'param') +
+    `<span style="color:var(--muted);font-size:0.85rem;margin-left:0.5rem;">\u2190 B0 (intercept)<br>\u2190 B1 (slope)</span>` +
+    `</div>`;
+
+  const sig=fit.pF<0.05;
+  const ybar2=mean(matY);
+  document.getElementById('matrixResult').innerHTML=
+    `<b>Coefficients:</b>  B0 = ${fit.b0.toFixed(3)}   B1 = ${fit.b1.toFixed(4)}   R\u00B2 = ${fit.R2.toFixed(4)}\n\n`+
+    `<b>Reduced model error</b> (Y = mean = ${ybar2.toFixed(1)}):\n`+
+    `  SSTO = \u03A3(Yi \u2013 Y\u0304)\u00B2 = ${fit.SSTO.toFixed(1)}     df = ${n-1} (n\u22121 = ${n}\u22121)\n\n`+
+    `<b>Full model error</b> (Y = ${fit.b0.toFixed(1)} + ${fit.b1.toFixed(3)}X):\n`+
+    `  SSE  = \u03A3(Yi \u2013 \u0176i)\u00B2 = ${fit.SSE.toFixed(1)}     df = ${n-2} (n\u22122 = ${n}\u22122)\n\n`+
+    `<b>Difference</b> (variance explained by adding B1):\n`+
+    `  SSR  = SSTO \u2013 SSE = ${fit.SSTO.toFixed(1)} \u2013 ${fit.SSE.toFixed(1)} = ${fit.SSR.toFixed(1)}     df = 1\n\n`+
+    `<b>F statistic:</b>\n`+
+    `  F = (SSR / df_SSR) / (SSE / df_SSE)\n`+
+    `    = (${fit.SSR.toFixed(1)} / 1) / (${fit.SSE.toFixed(1)} / ${n-2})\n`+
+    `    = ${fit.MSR.toFixed(2)} / ${fit.MSE.toFixed(2)}\n`+
+    `    = ${fit.F.toFixed(2)}\n\n`+
+    `  p-value = P(F(1,${n-2}) > ${fit.F.toFixed(2)}) = ${fit.pF<0.0001?fit.pF.toExponential(3):fit.pF.toFixed(4)}  ${sig?'*** SIGNIFICANT':'(not significant)'}`;
+
+  // Also draw scramble canvas with original data
+  drawScramble();
+}
+
+function scrambleY(){
+  if(matX.length<2)return;
+  const shuffled=[...matY];
+  for(let i=shuffled.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[shuffled[i],shuffled[j]]=[shuffled[j],shuffled[i]];}
+  matY=shuffled;
+  drawMatrix();
+}
+function unscrambleY(){
+  if(matYorig.length<2)return;
+  matY=[...matYorig];
+  drawMatrix();
+}
+
+function drawScramble(){
+  if(matX.length<2)return;
+  const fit=fitLM(matX,matY);
+  const ctx=getCtx('scrambleCanvas');
+  const info=drawScatter(ctx,matX,matY,'rgba(79,195,247,0.85)',
+    `Current fit: R\u00B2 = ${fit.R2.toFixed(4)}, F = ${fit.F.toFixed(2)}, p = ${fit.pF<0.0001?fit.pF.toExponential(3):fit.pF.toFixed(4)}`,
+    matXLabel,matYLabel);
+  ctx.strokeStyle='#e94560';ctx.lineWidth=2;
+  ctx.beginPath();
+  ctx.moveTo(info.xToP(info.xLo),info.yToP(fit.b0+fit.b1*info.xLo));
+  ctx.lineTo(info.xToP(info.xHi),info.yToP(fit.b0+fit.b1*info.xHi));
+  ctx.stroke();
+
+  const ybar=mean(matY);
+  ctx.strokeStyle='rgba(155,89,182,0.5)';ctx.lineWidth=1.5;ctx.setLineDash([8,6]);
+  ctx.beginPath();
+  ctx.moveTo(info.xToP(info.xLo),info.yToP(ybar));
+  ctx.lineTo(info.xToP(info.xHi),info.yToP(ybar));
+  ctx.stroke();ctx.setLineDash([]);
+
+  const n2=matX.length;
+  const ybar2=mean(matY);
+  document.getElementById('scrambleResult').innerHTML=
+    `<b>Reduced model</b> (B1 = 0, just the mean Y\u0304 = ${ybar2.toFixed(1)}):\n`+
+    `  Reduced error = \u03A3(Yi \u2013 Y\u0304)\u00B2 = ${fit.SSTO.toFixed(1)}    df = ${n2-1}\n\n`+
+    `<b>Full model</b> (Y = ${fit.b0.toFixed(1)} + ${fit.b1.toFixed(3)}X):\n`+
+    `  Full error    = \u03A3(Yi \u2013 \u0176i)\u00B2 = ${fit.SSE.toFixed(1)}    df = ${n2-2}\n\n`+
+    `<b>How much did adding B1 help?</b>\n`+
+    `  Reduced error \u2013 Full error = ${fit.SSTO.toFixed(1)} \u2013 ${fit.SSE.toFixed(1)} = ${fit.SSR.toFixed(1)}  (SSR)\n\n`+
+    `<b>F = (Reduced \u2013 Full) / (df_reduced \u2013 df_full)  \u00F7  Full / df_full</b>\n`+
+    `  = (${fit.SSTO.toFixed(1)} \u2013 ${fit.SSE.toFixed(1)}) / (${n2-1} \u2013 ${n2-2})  \u00F7  ${fit.SSE.toFixed(1)} / ${n2-2}\n`+
+    `  = ${fit.SSR.toFixed(1)} / 1  \u00F7  ${fit.MSE.toFixed(2)}\n`+
+    `  = <b>${fit.F.toFixed(2)}</b>\n\n`+
+    `R\u00B2 = SSR / SSTO = ${fit.SSR.toFixed(1)} / ${fit.SSTO.toFixed(1)} = <b>${fit.R2.toFixed(4)}</b>\n`+
+    `p-value = P(F(1,${n2-2}) > ${fit.F.toFixed(2)}) = <b>${fit.pF<0.0001?fit.pF.toExponential(3):fit.pF.toFixed(4)}</b>\n\n`+
+    (fit.pF<0.05?'\u26A0 Still significant (by chance)! Try scrambling again.'
+      :'\u2714 Not significant \u2014 adding B1 did NOT meaningfully reduce error over just using the mean.');
+}
+
+
+// ===== F DISTRIBUTION =====
+function runFDist(){
+  const d1=+document.getElementById('fd1').value;
+  const d2=+document.getElementById('fd2').value;
+  const trials=+document.getElementById('fTrials').value;
+  const data=[];
+  for(let i=0;i<trials;i++){
+    let chi1=0,chi2=0;
+    for(let j=0;j<d1;j++){const z=rnorm();chi1+=z*z;}
+    for(let j=0;j<d2;j++){const z=rnorm();chi2+=z*z;}
+    data.push((chi1/d1)/(chi2/d2));
+  }
+  const hi=Math.min(Math.max(...data),d1>2?d1/(d1-2)*4:10);
+  const ctx=getCtx('fDistCanvas');
+  drawHistogram(ctx,data,80,'rgba(79,195,247,0.5)',
+    `F Distribution: Bootstrap vs Theory (df1=${d1}, df2=${d2})`,
+    'F value',0,hi,x=>dfDist(x,d1,d2));
+
+  const thMean=d2>2?d2/(d2-2):Infinity;
+  document.getElementById('fDistResult').innerHTML=
+    `${trials} simulated F values  |  df1 = ${d1}, df2 = ${d2}\n`+
+    `Bootstrap mean: ${mean(data).toFixed(3)}  |  Theoretical mean: ${d2>2?thMean.toFixed(3):'undefined (df2 \u2264 2)'}\n`+
+    `Blue = bootstrap histogram  |  Red = theoretical F(${d1},${d2}) density`;
+}
+
+function drawFCritical(){
+  const fVal=+document.getElementById('fCrit').value;
+  const d1=+document.getElementById('fcD1').value;
+  const d2=+document.getElementById('fcD2').value;
+  const ctx=getCtx('fCritCanvas');
+  const W=ctx.canvas.width,H=ctx.canvas.height;
+  const pad={l:55,r:15,t:35,b:40};
+  const plotW=W-pad.l-pad.r,plotH=H-pad.t-pad.b;
+  const xHi=Math.max(8,fVal+3);
+  const steps=300;
+
+  // Find max density for scaling
+  let maxD=0;
+  for(let s=0;s<=steps;s++){const x=0.01+xHi*s/steps;maxD=Math.max(maxD,dfDist(x,d1,d2));}
+  if(maxD===0)maxD=1;
+
+  function xToP(x){return pad.l+(x/xHi)*plotW;}
+  function yToP(y){return H-pad.b-(y/(maxD*1.15))*plotH;}
+
+  ctx.strokeStyle='#555';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(pad.l,H-pad.b);ctx.lineTo(W-pad.r,H-pad.b);ctx.stroke();
+
+  // Shade right tail
+  ctx.fillStyle='rgba(233,69,96,0.3)';
+  ctx.beginPath();ctx.moveTo(xToP(fVal),yToP(0));
+  for(let s=0;s<=100;s++){const x=fVal+(xHi-fVal)*s/100;ctx.lineTo(xToP(x),yToP(dfDist(x,d1,d2)));}
+  ctx.lineTo(xToP(xHi),yToP(0));ctx.fill();
+
+  // Curve
+  ctx.strokeStyle='#4fc3f7';ctx.lineWidth=2.5;ctx.beginPath();
+  for(let s=0;s<=steps;s++){
+    const x=0.01+xHi*s/steps;
+    const px=xToP(x),py=yToP(dfDist(x,d1,d2));
+    s===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
+  }
+  ctx.stroke();
+
+  // F line
+  ctx.strokeStyle='#f39c12';ctx.lineWidth=2;ctx.setLineDash([5,5]);
+  ctx.beginPath();ctx.moveTo(xToP(fVal),yToP(0));ctx.lineTo(xToP(fVal),yToP(dfDist(fVal,d1,d2)));
+  ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle='#f39c12';ctx.font='bold 13px Segoe UI';ctx.textAlign='center';
+  ctx.fillText(`F = ${fVal.toFixed(1)}`,xToP(fVal),yToP(dfDist(fVal,d1,d2))-12);
+
+  ctx.fillStyle='#aab';ctx.font='11px Segoe UI';
+  for(let i=0;i<=5;i++){const v=xHi*i/5;ctx.fillText(v.toFixed(1),pad.l+(i/5)*plotW,H-pad.b+15);}
+  ctx.fillStyle='#eee';ctx.font='bold 12px Segoe UI';
+  ctx.fillText(`F(${d1},${d2}) distribution \u2014 shaded = p-value`,W/2,pad.t-10);
+
+  const pVal=1-pfDist(fVal,d1,d2);
+  const sig=pVal<0.05;
+  document.getElementById('fCritResult').innerHTML=
+    `F = ${fVal.toFixed(1)}, df1 = ${d1}, df2 = ${d2}\n`+
+    `p-value (right tail) = ${pVal<0.0001?pVal.toExponential(3):pVal.toFixed(4)}  ${sig?'\u2014 SIGNIFICANT (p < 0.05)':'\u2014 not significant'}`;
+}
+
+
+// ===== ANOVA FOR REGRESSION =====
+function runAnovaReg(){
+  const slope=+document.getElementById('arSlope').value;
+  const noise=+document.getElementById('arNoise').value;
+  const n=+document.getElementById('arN').value;
+  const X=[],Y=[];
+  for(let i=0;i<n;i++){
+    const x=1+Math.random()*19; // 1-20 hours practice
+    X.push(x);
+    Y.push(45+slope*x+rnormMS(0,noise));
+  }
+  const fit=fitLM(X,Y);
+  const ybar=mean(Y);
+
+  // Scatter + both models
+  const ctx=getCtx('anovaRegCanvas');
+  const info=drawScatter(ctx,X,Y,'rgba(79,195,247,0.85)',
+    'Free Throw Accuracy vs Practice Hours','Practice (hrs/week)','Accuracy (%)');
+
+  // Full model line
+  ctx.strokeStyle='#e94560';ctx.lineWidth=2.5;
+  ctx.beginPath();
+  ctx.moveTo(info.xToP(info.xLo),info.yToP(fit.b0+fit.b1*info.xLo));
+  ctx.lineTo(info.xToP(info.xHi),info.yToP(fit.b0+fit.b1*info.xHi));
+  ctx.stroke();
+
+  // Reduced model (mean) line
+  ctx.strokeStyle='rgba(155,89,182,0.6)';ctx.lineWidth=2;ctx.setLineDash([8,6]);
+  ctx.beginPath();
+  ctx.moveTo(info.xToP(info.xLo),info.yToP(ybar));
+  ctx.lineTo(info.xToP(info.xHi),info.yToP(ybar));
+  ctx.stroke();ctx.setLineDash([]);
+
+  // Residual lines to full model
+  ctx.strokeStyle='rgba(243,156,18,0.3)';ctx.lineWidth=1;
+  for(let i=0;i<n;i++){
+    ctx.beginPath();ctx.moveTo(info.xToP(X[i]),info.yToP(Y[i]));
+    ctx.lineTo(info.xToP(X[i]),info.yToP(fit.yhat[i]));ctx.stroke();
+  }
+
+  // Legend
+  ctx.font='11px Segoe UI';ctx.textAlign='left';
+  const lx=info.pad.l+10,ly=40;
+  ctx.strokeStyle='#e94560';ctx.lineWidth=2.5;ctx.setLineDash([]);
+  ctx.beginPath();ctx.moveTo(lx,ly);ctx.lineTo(lx+20,ly);ctx.stroke();
+  ctx.fillStyle='#e94560';ctx.fillText(`Full: Y = ${fit.b0.toFixed(1)} + ${fit.b1.toFixed(2)}X (SSE = ${fit.SSE.toFixed(0)}, df = ${n-2})`,lx+25,ly+4);
+
+  ctx.strokeStyle='rgba(155,89,182,0.7)';ctx.lineWidth=2;ctx.setLineDash([8,6]);
+  ctx.beginPath();ctx.moveTo(lx,ly+16);ctx.lineTo(lx+20,ly+16);ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle='#9b59b6';ctx.fillText(`Reduced: Y = ${ybar.toFixed(1)} (SSE = ${fit.SSTO.toFixed(0)}, df = ${n-1})`,lx+25,ly+20);
+
+  // ANOVA bar
+  const ctx2=getCtx('anovaBarCanvas');
+  const AW=ctx2.canvas.width,AH=ctx2.canvas.height;
+  const barY=40,barH=40;
+  const ssrFrac=fit.SSTO>0?fit.SSR/fit.SSTO:0;
+  ctx2.fillStyle='#2ecc71';ctx2.fillRect(50,barY,ssrFrac*(AW-100),barH);
+  ctx2.fillStyle='#e94560';ctx2.fillRect(50+ssrFrac*(AW-100),barY,(1-ssrFrac)*(AW-100),barH);
+  ctx2.strokeStyle='#eee';ctx2.lineWidth=1;ctx2.strokeRect(50,barY,AW-100,barH);
+  ctx2.fillStyle='#eee';ctx2.font='bold 13px Segoe UI';ctx2.textAlign='center';
+  ctx2.fillText(`SSTO = ${fit.SSTO.toFixed(0)}  \u2192  SSR (explained) + SSE (error)    |    R\u00B2 = ${fit.R2.toFixed(4)}`,AW/2,25);
+  if(ssrFrac>0.1){ctx2.fillStyle='#111';ctx2.font='bold 12px Segoe UI';ctx2.fillText(`SSR=${fit.SSR.toFixed(0)}`,50+ssrFrac*(AW-100)/2,barY+barH/2+5);}
+  if(1-ssrFrac>0.1){ctx2.fillStyle='#fff';ctx2.font='bold 12px Segoe UI';ctx2.fillText(`SSE=${fit.SSE.toFixed(0)}`,50+ssrFrac*(AW-100)+(1-ssrFrac)*(AW-100)/2,barY+barH/2+5);}
+
+  ctx2.fillStyle='#aab';ctx2.font='11px Segoe UI';ctx2.textAlign='center';
+  ctx2.fillText(`(Reduced error \u2013 Full error) / 1 = SSR = ${fit.SSR.toFixed(1)}    |    Full error / ${n-2} = MSE = ${fit.MSE.toFixed(1)}    |    F = SSR/MSE = ${fit.F.toFixed(2)}`,AW/2,barY+barH+20);
+
+  // ANOVA table with full F algebra
+  const sig=fit.pF<0.05;
+  document.getElementById('anovaRegTable').innerHTML=
+    `<b>ANOVA Table</b>\n`+
+    `Source        df    Sum Sq      Mean Sq       F          p-value\n`+
+    `\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n`+
+    `Regression    1    ${fit.SSR.toFixed(1).padStart(9)}  ${fit.MSR.toFixed(1).padStart(9)}  ${fit.F.toFixed(2).padStart(9)}  ${(fit.pF<0.0001?fit.pF.toExponential(3):fit.pF.toFixed(4)).padStart(10)}\n`+
+    `Residual    ${(n-2).toString().padStart(3)}    ${fit.SSE.toFixed(1).padStart(9)}  ${fit.MSE.toFixed(1).padStart(9)}\n`+
+    `Total       ${(n-1).toString().padStart(3)}    ${fit.SSTO.toFixed(1).padStart(9)}\n\n`+
+    `<b>Step-by-step F calculation:</b>\n`+
+    `  Reduced error (just mean = ${ybar.toFixed(1)}): SSTO = ${fit.SSTO.toFixed(1)}, df = ${n-1}\n`+
+    `  Full error (with slope):              SSE  = ${fit.SSE.toFixed(1)}, df = ${n-2}\n\n`+
+    `  Numerator:   (Reduced \u2013 Full) / (df_reduced \u2013 df_full)\n`+
+    `             = (${fit.SSTO.toFixed(1)} \u2013 ${fit.SSE.toFixed(1)}) / (${n-1} \u2013 ${n-2})\n`+
+    `             = ${fit.SSR.toFixed(1)} / 1  =  MSR = ${fit.MSR.toFixed(2)}\n\n`+
+    `  Denominator: Full error / df_full\n`+
+    `             = ${fit.SSE.toFixed(1)} / ${n-2}  =  MSE = ${fit.MSE.toFixed(2)}\n\n`+
+    `  F = MSR / MSE = ${fit.MSR.toFixed(2)} / ${fit.MSE.toFixed(2)} = <b>${fit.F.toFixed(2)}</b>\n`+
+    `  p = P(F(1,${n-2}) > ${fit.F.toFixed(2)}) = <b>${fit.pF<0.0001?fit.pF.toExponential(3):fit.pF.toFixed(4)}</b>\n\n`+
+    (sig?'SIGNIFICANT \u2014 practice hours predict accuracy!':'Not significant \u2014 can\'t distinguish full model from reduced.');
+
+  // R output style
+  document.getElementById('rOutputDisplay').innerHTML=
+    `<b>summary(lm) gives:</b>  slope t = ${fit.tB1.toFixed(3)}, p = ${fit.pT<0.0001?fit.pT.toExponential(3):fit.pT.toFixed(4)}\n`+
+    `<b>anova(lm) gives:</b>   F = ${fit.F.toFixed(3)}, p = ${fit.pF<0.0001?fit.pF.toExponential(3):fit.pF.toFixed(4)}\n\n`+
+    `Notice: t\u00B2 = ${fit.tB1.toFixed(3)}\u00B2 = ${(fit.tB1**2).toFixed(3)}  \u2248  F = ${fit.F.toFixed(3)}\n`+
+    `And the p-values are identical! They're the same test.`;
+}
+
+
+// ===== ANOVA AS T-TEST =====
+function runAnovaTTest(){
+  const muDog=+document.getElementById('atDog').value;
+  const muCat=+document.getElementById('atCat').value;
+  const sigma=+document.getElementById('atSD').value;
+  const n1=+document.getElementById('atN1').value;
+  const n2=+document.getElementById('atN2').value;
+
+  const dogs=[],cats=[];
+  for(let i=0;i<n1;i++) dogs.push(rnormMS(muDog,sigma));
+  for(let i=0;i<n2;i++) cats.push(rnormMS(muCat,sigma));
+
+  // Draw strip chart
+  const ctx=getCtx('atCanvas');
+  const all=[...dogs,...cats];
+  const lo=Math.min(...all)-1,hi=Math.max(...all)+1;
+  const W=ctx.canvas.width,H=ctx.canvas.height;
+  const pad={l:85,r:15,t:35,b:40};
+  const plotW=W-pad.l-pad.r,plotH=H-pad.t-pad.b;
+  function xToP(x){return pad.l+((x-lo)/(hi-lo))*plotW;}
+
+  ctx.strokeStyle='#555';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(pad.l,H-pad.b);ctx.lineTo(W-pad.r,H-pad.b);ctx.stroke();
+
+  const y1=pad.t+plotH*0.3, y2=pad.t+plotH*0.7;
+
+  // Dogs
+  ctx.fillStyle='rgba(79,195,247,0.6)';
+  for(const v of dogs){ctx.beginPath();ctx.arc(xToP(v),y1+(Math.random()-0.5)*25,5,0,2*Math.PI);ctx.fill();}
+  const mDog=mean(dogs);
+  ctx.strokeStyle='#4fc3f7';ctx.lineWidth=3;
+  ctx.beginPath();ctx.moveTo(xToP(mDog),y1-20);ctx.lineTo(xToP(mDog),y1+20);ctx.stroke();
+
+  // Cats
+  ctx.fillStyle='rgba(243,156,18,0.6)';
+  for(const v of cats){ctx.beginPath();ctx.arc(xToP(v),y2+(Math.random()-0.5)*25,5,0,2*Math.PI);ctx.fill();}
+  const mCat=mean(cats);
+  ctx.strokeStyle='#f39c12';ctx.lineWidth=3;
+  ctx.beginPath();ctx.moveTo(xToP(mCat),y2-20);ctx.lineTo(xToP(mCat),y2+20);ctx.stroke();
+
+  // Grand mean
+  const grandMean=mean(all);
+  ctx.strokeStyle='rgba(155,89,182,0.5)';ctx.lineWidth=1.5;ctx.setLineDash([6,4]);
+  ctx.beginPath();ctx.moveTo(xToP(grandMean),pad.t);ctx.lineTo(xToP(grandMean),H-pad.b);ctx.stroke();ctx.setLineDash([]);
+
+  ctx.fillStyle='#4fc3f7';ctx.font='bold 13px Segoe UI';ctx.textAlign='right';
+  ctx.fillText('Dogs',pad.l-8,y1+5);
+  ctx.fillStyle='#f39c12';ctx.fillText('Cats',pad.l-8,y2+5);
+
+  ctx.fillStyle='#aab';ctx.font='11px Segoe UI';ctx.textAlign='center';
+  for(let i=0;i<=5;i++){const v=lo+(hi-lo)*i/5;ctx.fillText(v.toFixed(1),pad.l+(i/5)*plotW,H-pad.b+15);}
+  ctx.fillStyle='#eee';ctx.font='bold 12px Segoe UI';ctx.fillText('Sleep Hours per Day',W/2,pad.t-10);
+  ctx.fillStyle='#9b59b6';ctx.font='11px Segoe UI';ctx.fillText(`grand mean = ${grandMean.toFixed(1)}`,xToP(grandMean),pad.t-2);
+
+  // Design matrix as proper column vectors
+  function matColLocal(title, values, cls='data') {
+    let cells = values.map(v => `<div class="mat-cell ${cls}">${v}</div>`).join('');
+    return `<div class="mat-col-group"><div class="mat-col-title">${title}</div><div class="mat-col">${cells}</div></div>`;
+  }
+  function mat2ColLocal(title, col1, col2) {
+    let cells = col1.map((v,i) => `<div class="mat-cell data">${v}</div><div class="mat-cell data">${col2[i]}</div>`).join('');
+    return `<div class="mat-col-group"><div class="mat-col-title">${title}</div><div class="mat-2col">${cells}</div></div>`;
+  }
+
+  const yVals = [...dogs,...cats].map(v=>v.toFixed(1));
+  const xCol1 = new Array(n1+n2).fill('1');
+  const xCol2 = [...new Array(n1).fill('0'), ...new Array(n2).fill('1')];
+  const labels = [...new Array(n1).fill('Dog'), ...new Array(n2).fill('Cat')];
+
+  // Build a label column
+  let labelCells = labels.map(l => `<div class="mat-cell" style="color:${l==='Dog'?'#4fc3f7':'#f39c12'};font-size:0.75rem;">${l}</div>`).join('');
+  let labelCol = `<div class="mat-col-group"><div class="mat-col-title"></div><div style="display:flex;flex-direction:column;align-items:center;padding:0.25rem 0.3rem;">${labelCells}</div></div>`;
+
+  document.getElementById('atDesignMatrix').innerHTML =
+    `<div class="mat-eq">` +
+    matColLocal('Y', yVals) +
+    `<span class="mat-op">=</span>` +
+    mat2ColLocal('X', xCol1, xCol2) +
+    labelCol +
+    `<span class="mat-op">\u00D7</span>` +
+    matColLocal('B', [`B0`, `B1`], 'param') +
+    `<span class="mat-op">+</span>` +
+    matColLocal('e', new Array(n1+n2).fill('\u22EF'), 'resid') +
+    `</div>` +
+    `<div style="margin-top:0.5rem;font-size:0.9rem;">` +
+    `<span class="param" style="color:var(--warn);">B0</span> = ${mDog.toFixed(2)} <span style="color:var(--muted);">(Dog mean)</span> &nbsp;&nbsp; ` +
+    `<span class="param" style="color:var(--warn);">B1</span> = ${(mCat-mDog).toFixed(2)} <span style="color:var(--muted);">(Cat \u2013 Dog = difference)</span>` +
+    `</div>`;
+
+  // t-test (equal variance)
+  const N=n1+n2;
+  const v1=variance(dogs),v2=variance(cats);
+  const sp2=((n1-1)*v1+(n2-1)*v2)/(N-2);
+  const se=Math.sqrt(sp2*(1/n1+1/n2));
+  const tStat=(mDog-mCat)/se;
+  const dfT=N-2;
+  const pT=2*pt(-Math.abs(tStat),dfT);
+
+  // ANOVA
+  const SSfull=dogs.reduce((s,x)=>s+(x-mDog)**2,0)+cats.reduce((s,x)=>s+(x-mCat)**2,0);
+  const SSreduced=all.reduce((s,x)=>s+(x-grandMean)**2,0);
+  const SSR2=SSreduced-SSfull;
+  const MSR2=SSR2/1;
+  const MSE2=SSfull/(N-2);
+  const F2=MSR2/MSE2;
+  const pF2=1-pfDist(F2,1,N-2);
+
+  const sig=pT<0.05;
+  document.getElementById('atComparison').innerHTML=
+    `<b>Equal-variance t-test:</b>\n`+
+    `  Dog mean = ${mDog.toFixed(2)},  Cat mean = ${mCat.toFixed(2)},  diff = ${(mDog-mCat).toFixed(2)}\n`+
+    `  Pooled s\u00B2 = ${sp2.toFixed(3)},  SE = ${se.toFixed(3)}\n`+
+    `  t = (${mDog.toFixed(2)} \u2013 ${mCat.toFixed(2)}) / ${se.toFixed(3)} = ${tStat.toFixed(4)}\n`+
+    `  df = ${n1} + ${n2} \u2013 2 = ${dfT}\n`+
+    `  p = ${pT<0.0001?pT.toExponential(3):pT.toFixed(4)}  ${sig?'***':''}\n\n`+
+    `<b>One-way ANOVA (same test, different framing):</b>\n`+
+    `  Reduced model (one grand mean = ${grandMean.toFixed(2)}):\n`+
+    `    Reduced error = \u03A3(Yi \u2013 Y\u0304)\u00B2 = ${SSreduced.toFixed(2)},  df = ${N-1}\n\n`+
+    `  Full model (two group means):\n`+
+    `    Full error = \u03A3(Yi \u2013 group mean)\u00B2 = ${SSfull.toFixed(2)},  df = ${N-2}\n\n`+
+    `  F = (Reduced \u2013 Full) / (df_reduced \u2013 df_full)  \u00F7  Full / df_full\n`+
+    `    = (${SSreduced.toFixed(2)} \u2013 ${SSfull.toFixed(2)}) / (${N-1} \u2013 ${N-2})  \u00F7  ${SSfull.toFixed(2)} / ${N-2}\n`+
+    `    = ${SSR2.toFixed(2)} / 1  \u00F7  ${MSE2.toFixed(2)}\n`+
+    `    = <b>${F2.toFixed(4)}</b>\n`+
+    `  p = P(F(1,${N-2}) > ${F2.toFixed(2)}) = ${pF2<0.0001?pF2.toExponential(3):pF2.toFixed(4)}  ${sig?'***':''}\n\n`+
+    `<b>They're identical:</b>\n`+
+    `  t\u00B2 = ${tStat.toFixed(4)}\u00B2 = ${(tStat**2).toFixed(4)}  \u2248  F = ${F2.toFixed(4)}  \u2714\n`+
+    `  p-values: ${pT.toFixed(6)} vs ${pF2.toFixed(6)}  \u2714`;
+}
+
+function runFequalsT2(){
+  const trials=+document.getElementById('atSimTrials').value;
+  const tSquared=[],fValues=[];
+  for(let i=0;i<trials;i++){
+    const n1=5,n2=6;
+    const a=[],b=[];
+    for(let j=0;j<n1;j++) a.push(rnormMS(10,2));
+    for(let j=0;j<n2;j++) b.push(rnormMS(10,2));
+
+    // t-test
+    const m1=mean(a),m2=mean(b);
+    const v1=variance(a),v2=variance(b);
+    const sp2=((n1-1)*v1+(n2-1)*v2)/(n1+n2-2);
+    const se=Math.sqrt(sp2*(1/n1+1/n2));
+    const t=(m1-m2)/se;
+    tSquared.push(t*t);
+
+    // ANOVA F
+    const grandMean=mean([...a,...b]);
+    const SSfull=a.reduce((s,x)=>s+(x-m1)**2,0)+b.reduce((s,x)=>s+(x-m2)**2,0);
+    const SSreduced=[...a,...b].reduce((s,x)=>s+(x-grandMean)**2,0);
+    const F=(SSreduced-SSfull)/1/(SSfull/(n1+n2-2));
+    fValues.push(F);
+  }
+
+  const ctx=getCtx('ft2Canvas');
+  const maxV=Math.max(Math.max(...tSquared),Math.max(...fValues));
+  const info=drawScatter(ctx,tSquared,fValues,'rgba(79,195,247,0.4)',
+    `F vs t\u00B2 across ${trials} experiments`,
+    't\u00B2 (from t-test)','F (from ANOVA)',{xLo:0,xHi:maxV,yLo:0,yHi:maxV,r:3});
+
+  // Identity line
+  ctx.strokeStyle='#e94560';ctx.lineWidth=2;ctx.setLineDash([6,4]);
+  ctx.beginPath();ctx.moveTo(info.xToP(0),info.yToP(0));ctx.lineTo(info.xToP(maxV),info.yToP(maxV));
+  ctx.stroke();ctx.setLineDash([]);
+
+  // Compute correlation
+  const corrNum=tSquared.reduce((s,t,i)=>s+(t-mean(tSquared))*(fValues[i]-mean(fValues)),0);
+  const corrDen=Math.sqrt(tSquared.reduce((s,t)=>s+(t-mean(tSquared))**2,0)*fValues.reduce((s,f)=>s+(f-mean(fValues))**2,0));
+
+  document.getElementById('ft2Result').innerHTML=
+    `Every point should fall exactly on the red diagonal (F = t\u00B2).\n`+
+    `Correlation between F and t\u00B2: r = ${(corrNum/corrDen).toFixed(8)}\n`+
+    `They are mathematically identical, not just approximately equal!`;
+}
+
+// Initialize F critical view
+drawFCritical();
+</script>
+</body>
+</html>
