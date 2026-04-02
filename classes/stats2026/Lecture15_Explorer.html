@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lecture 15 Explorer — Multiple Hypothesis Testing</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --card: #16213e; --accent: #0f3460;
+    --highlight: #e94560; --text: #eee; --muted: #aab;
+    --success: #2ecc71; --warn: #f39c12;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
+  header { background: linear-gradient(135deg, var(--accent), var(--card)); padding: 2rem; text-align: center; border-bottom: 3px solid var(--highlight); }
+  header h1 { font-size: 2rem; margin-bottom: 0.3rem; }
+  header p { color: var(--muted); font-size: 1rem; }
+  nav { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem; padding: 1rem; background: var(--card); position: sticky; top: 0; z-index: 100; border-bottom: 1px solid #333; }
+  nav button { background: var(--accent); color: var(--text); border: none; padding: 0.5rem 1.2rem; border-radius: 20px; cursor: pointer; font-size: 0.9rem; transition: all 0.2s; }
+  nav button:hover, nav button.active { background: var(--highlight); transform: scale(1.05); }
+  .section { display: none; max-width: 1050px; margin: 2rem auto; padding: 0 1rem; }
+  .section.active { display: block; }
+  .card { background: var(--card); border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; border: 1px solid #2a2a4a; }
+  .card h2 { color: var(--highlight); margin-bottom: 0.5rem; font-size: 1.4rem; }
+  .card h3 { color: var(--warn); margin: 1rem 0 0.5rem; font-size: 1.1rem; }
+  .controls { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; margin: 1rem 0; padding: 1rem; background: rgba(0,0,0,0.2); border-radius: 8px; }
+  .control-group { display: flex; flex-direction: column; gap: 0.2rem; }
+  .control-group label { font-size: 0.8rem; color: var(--muted); }
+  input[type=range] { width: 150px; accent-color: var(--highlight); }
+  button.run-btn { background: var(--highlight); color: white; border: none; padding: 0.6rem 1.5rem; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: bold; transition: all 0.2s; }
+  button.run-btn:hover { transform: scale(1.05); filter: brightness(1.2); }
+  button.run-btn.secondary { background: var(--accent); }
+  canvas { width: 100%; max-width: 800px; display: block; margin: 1rem auto; border-radius: 8px; background: #111; }
+  .result-box { background: rgba(0,0,0,0.3); padding: 1rem; border-radius: 8px; margin-top: 1rem; font-family: 'Consolas', monospace; font-size: 0.95rem; border-left: 3px solid var(--highlight); white-space: pre-wrap; }
+  .explanation { background: rgba(46,204,113,0.1); border: 1px solid rgba(46,204,113,0.3); padding: 1rem; border-radius: 8px; margin-top: 1rem; }
+  .explanation strong { color: var(--success); }
+  .sig { color: var(--highlight); font-weight: bold; }
+  .ns { color: var(--success); }
+  .scenario { font-style: italic; color: var(--warn); margin-bottom: 0.5rem; display: block; }
+  code { background: rgba(255,255,255,0.1); padding: 0.1em 0.4em; border-radius: 3px; font-size: 0.9em; }
+  .two-canvas { display: flex; flex-wrap: wrap; gap: 1rem; justify-content: center; }
+  .two-canvas canvas { max-width: 390px; }
+  table.compare-table { border-collapse: collapse; margin: 0.5rem 0; width: 100%; }
+  table.compare-table th, table.compare-table td { border: 1px solid #444; padding: 0.4rem 0.8rem; text-align: center; }
+  table.compare-table th { background: var(--accent); }
+  table.compare-table td.good { color: var(--success); font-weight: bold; }
+  table.compare-table td.bad { color: var(--highlight); font-weight: bold; }
+  .step-display { font-family: 'Consolas', monospace; font-size: 0.85rem; background: rgba(0,0,0,0.3); padding: 1rem; border-radius: 8px; overflow-x: auto; margin: 0.5rem 0; line-height: 1.5; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Lecture 15 Explorer</h1>
+  <p>Multiple Hypothesis Testing &mdash; Bonferroni, Benjamini-Hochberg FDR &amp; When 20,000 Tests Go Wrong</p>
+</header>
+
+<nav>
+  <button class="active" onclick="showSection('null-pvals')">P-Values Under Null</button>
+  <button onclick="showSection('bonferroni')">Bonferroni</button>
+  <button onclick="showSection('bh-fdr')">BH FDR</button>
+  <button onclick="showSection('compare')">Compare Methods</button>
+</nav>
+
+<!-- ==================== P-VALUE DISTRIBUTION UNDER NULL ==================== -->
+<div id="null-pvals" class="section active">
+  <div class="card">
+    <h2>P-Value Distribution Under the Null Hypothesis</h2>
+    <span class="scenario">You run an RNA-seq experiment with two conditions and test 20,000 genes. But suppose the truth is: no gene is actually different between conditions. Every gene is a null hypothesis. What happens to the p-values?</span>
+
+    <div class="controls">
+      <div class="control-group">
+        <label>Number of genes: <span id="nullNVal">20000</span></label>
+        <input type="range" id="nullN" min="1000" max="50000" value="20000" step="1000" oninput="document.getElementById('nullNVal').textContent=this.value">
+      </div>
+      <div class="control-group">
+        <label>Significance threshold (&alpha;): <span id="nullAlphaVal">0.05</span></label>
+        <input type="range" id="nullAlpha" min="0.001" max="0.20" value="0.05" step="0.001" oninput="document.getElementById('nullAlphaVal').textContent=parseFloat(this.value).toFixed(3)">
+      </div>
+      <button class="run-btn" onclick="runNullPvals()">Simulate Null Experiment</button>
+    </div>
+
+    <canvas id="nullCanvas" width="800" height="380"></canvas>
+    <div id="nullResult" class="result-box">Click "Simulate Null Experiment" to generate p-values for 20,000 genes where NOTHING is different</div>
+
+    <div class="explanation">
+      <strong>Key insight:</strong> When the null hypothesis is true, p-values are <em>uniformly distributed</em> between 0 and 1. This means about 5% of genes will have p &lt; 0.05 purely by chance. With 20,000 genes, that's roughly <b>1,000 false positives</b>! This is the fundamental problem that motivates multiple testing correction. In R: <code>runif(20000)</code> gives you p-values that look just like this.
+    </div>
+  </div>
+</div>
+
+<!-- ==================== BONFERRONI CORRECTION ==================== -->
+<div id="bonferroni" class="section">
+  <div class="card">
+    <h2>Bonferroni Correction &mdash; The Conservative Approach</h2>
+    <span class="scenario">To control the probability of making ANY false positive (family-wise error rate), simply divide your threshold by the number of tests. With 20,000 tests and &alpha; = 0.05: the Bonferroni threshold = 0.05 / 20,000 = 2.5 &times; 10<sup>-6</sup>.</span>
+
+    <div class="controls">
+      <div class="control-group">
+        <label>Number of tests: <span id="bonfNVal">20000</span></label>
+        <input type="range" id="bonfN" min="1000" max="50000" value="20000" step="1000" oninput="document.getElementById('bonfNVal').textContent=this.value">
+      </div>
+      <div class="control-group">
+        <label>Desired &alpha;: <span id="bonfAlphaVal">0.05</span></label>
+        <input type="range" id="bonfAlpha" min="0.01" max="0.20" value="0.05" step="0.01" oninput="document.getElementById('bonfAlphaVal').textContent=parseFloat(this.value).toFixed(2)">
+      </div>
+      <div class="control-group">
+        <label>True positives: <span id="bonfTPVal">200</span></label>
+        <input type="range" id="bonfTP" min="0" max="2000" value="200" step="50" oninput="document.getElementById('bonfTPVal').textContent=this.value">
+      </div>
+      <div class="control-group">
+        <label>Effect size (true signal): <span id="bonfEffVal">3.0</span></label>
+        <input type="range" id="bonfEff" min="1.0" max="6.0" value="3.0" step="0.5" oninput="document.getElementById('bonfEffVal').textContent=parseFloat(this.value).toFixed(1)">
+      </div>
+      <button class="run-btn" onclick="runBonferroni()">Run Experiment</button>
+    </div>
+
+    <h3>Sorted P-Values with Thresholds</h3>
+    <canvas id="bonfCanvas" width="800" height="400"></canvas>
+
+    <div id="bonfResult" class="result-box">Click "Run Experiment" to see Bonferroni in action</div>
+
+    <div class="explanation">
+      <strong>Bonferroni:</strong> Adjusted p-value = min(1, raw_p &times; N). Equivalently, use threshold &alpha;/N instead of &alpha;. This controls the <b>family-wise error rate</b> (FWER): the probability of making even ONE false positive is at most &alpha;. Very safe, but very conservative &mdash; at small sample sizes with modest effects, few genes may reach this extreme threshold. In R: <code>p.adjust(p, method="bonferroni")</code>.
+    </div>
+  </div>
+</div>
+
+<!-- ==================== BENJAMINI-HOCHBERG FDR ==================== -->
+<div id="bh-fdr" class="section">
+  <div class="card">
+    <h2>Benjamini-Hochberg FDR &mdash; A Less Conservative Approach</h2>
+    <span class="scenario">Instead of preventing ANY false positives, BH controls the expected <em>proportion</em> of false discoveries. If you set FDR = 0.10, on average 10% of the genes you call "significant" will be false positives &mdash; a much more practical standard for genomics.</span>
+
+    <div class="controls">
+      <div class="control-group">
+        <label>Number of genes: <span id="bhNVal">20000</span></label>
+        <input type="range" id="bhN" min="1000" max="50000" value="20000" step="1000" oninput="document.getElementById('bhNVal').textContent=this.value">
+      </div>
+      <div class="control-group">
+        <label>True signal genes: <span id="bhTPVal">500</span></label>
+        <input type="range" id="bhTP" min="0" max="5000" value="500" step="100" oninput="document.getElementById('bhTPVal').textContent=this.value">
+      </div>
+      <div class="control-group">
+        <label>FDR threshold: <span id="bhFDRVal">0.10</span></label>
+        <input type="range" id="bhFDR" min="0.01" max="0.30" value="0.10" step="0.01" oninput="document.getElementById('bhFDRVal').textContent=parseFloat(this.value).toFixed(2)">
+      </div>
+      <div class="control-group">
+        <label>Effect size: <span id="bhEffVal">3.0</span></label>
+        <input type="range" id="bhEff" min="1.0" max="6.0" value="3.0" step="0.5" oninput="document.getElementById('bhEffVal').textContent=parseFloat(this.value).toFixed(1)">
+      </div>
+      <button class="run-btn" onclick="runBH()">Run BH Procedure</button>
+    </div>
+
+    <h3>The Classic BH Plot &mdash; Sorted P-Values vs BH Line</h3>
+    <canvas id="bhCanvas" width="800" height="420"></canvas>
+
+    <h3>Step-by-Step BH Calculation (Top Hits)</h3>
+    <div id="bhSteps" class="step-display">Run the procedure to see the step-by-step calculation...</div>
+
+    <div id="bhResult" class="result-box">Click "Run BH Procedure" to see Benjamini-Hochberg in action</div>
+
+    <div class="explanation">
+      <strong>The BH algorithm:</strong> (1) Rank all N p-values from smallest to largest. (2) For rank k, compute the BH line: k &times; FDR / N. (3) Going from the largest rank down, find the first p-value that falls below its BH line. (4) Declare that gene and all genes with smaller p-values as discoveries. At rank k=1 (the single best gene), the BH threshold = FDR/N = Bonferroni! But for higher ranks, BH is progressively more lenient. In R: <code>p.adjust(p, method="BH")</code>.
+    </div>
+  </div>
+</div>
+
+<!-- ==================== COMPARE ALL METHODS ==================== -->
+<div id="compare" class="section">
+  <div class="card">
+    <h2>Head-to-Head: No Correction vs Bonferroni vs BH FDR</h2>
+    <span class="scenario">Run the same experiment through all three approaches and see the tradeoff: more discoveries means more power, but also more false positives. Which method strikes the right balance?</span>
+
+    <div class="controls">
+      <div class="control-group">
+        <label>Number of genes: <span id="cmpNVal">20000</span></label>
+        <input type="range" id="cmpN" min="1000" max="50000" value="20000" step="1000" oninput="document.getElementById('cmpNVal').textContent=this.value">
+      </div>
+      <div class="control-group">
+        <label>True signal genes: <span id="cmpTPVal">500</span></label>
+        <input type="range" id="cmpTP" min="0" max="5000" value="500" step="100" oninput="document.getElementById('cmpTPVal').textContent=this.value">
+      </div>
+      <div class="control-group">
+        <label>Effect size: <span id="cmpEffVal">3.0</span></label>
+        <input type="range" id="cmpEff" min="1.0" max="6.0" value="3.0" step="0.5" oninput="document.getElementById('cmpEffVal').textContent=parseFloat(this.value).toFixed(1)">
+      </div>
+      <div class="control-group">
+        <label>&alpha; / FDR threshold: <span id="cmpAlphaVal">0.05</span></label>
+        <input type="range" id="cmpAlpha" min="0.01" max="0.20" value="0.05" step="0.01" oninput="document.getElementById('cmpAlphaVal').textContent=parseFloat(this.value).toFixed(2)">
+      </div>
+      <button class="run-btn" onclick="runCompare()">Compare Methods</button>
+    </div>
+
+    <canvas id="cmpCanvas" width="800" height="350"></canvas>
+
+    <div id="cmpTable" class="result-box">Click "Compare Methods" to see the head-to-head results</div>
+
+    <div class="explanation">
+      <strong>The tradeoff:</strong> <b>No correction</b> catches the most true positives but is flooded with false positives. <b>Bonferroni</b> has almost zero false positives but misses many real signals (low power). <b>BH FDR</b> is the middle ground &mdash; it tolerates a controlled proportion of false discoveries in exchange for finding many more real signals. That's why genomics papers almost universally report FDR-adjusted p-values. Try setting effect size low and see how Bonferroni misses nearly everything!
+    </div>
+  </div>
+</div>
+
+<footer style="text-align:center;padding:2rem;color:var(--muted);font-size:0.85rem;">
+  Lecture 15 Explorer &mdash; Interactive demos for multiple hypothesis testing, Bonferroni &amp; Benjamini-Hochberg FDR
+</footer>
+
+<script>
+// ===== MATH UTILITIES =====
+function rnorm(){let u=Math.random(),v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+function rnormMS(m,s){return m+s*rnorm();}
+function mean(a){return a.reduce((s,x)=>s+x,0)/a.length;}
+
+// Normal CDF approximation (Abramowitz & Stegun)
+function normalCDF(x){
+  if(x<-8) return 0;
+  if(x>8) return 1;
+  const a1=0.254829592, a2=-0.284496736, a3=1.421413741, a4=-1.453152027, a5=1.061405429;
+  const p=0.3275911;
+  const sign = x<0 ? -1 : 1;
+  x = Math.abs(x)/Math.SQRT2;
+  const t = 1.0/(1.0+p*x);
+  const y = 1.0 - (((((a5*t + a4)*t) + a3)*t + a2)*t + a1)*t * Math.exp(-x*x);
+  return 0.5*(1.0+sign*y);
+}
+
+// Convert z-score to two-sided p-value
+function zToP(z){
+  return 2*(1-normalCDF(Math.abs(z)));
+}
+
+// Generate p-values for a mix of null and true-positive genes
+function generatePValues(nTotal, nSignal, effectSize){
+  const pvals = [];
+  const isSignal = [];
+  for(let i=0; i<nTotal; i++){
+    if(i < nSignal){
+      // True positive: z from N(effectSize, 1)
+      const z = rnormMS(effectSize, 1);
+      pvals.push(zToP(z));
+      isSignal.push(true);
+    } else {
+      // Null: uniform p-value
+      pvals.push(Math.random());
+      isSignal.push(false);
+    }
+  }
+  return {pvals, isSignal};
+}
+
+// Benjamini-Hochberg procedure: returns array of {rank, rawP, bhThreshold, isDiscovery, isSignal}
+function bhProcedure(pvals, isSignal, fdrThreshold){
+  const n = pvals.length;
+  // Create indexed array and sort by p-value
+  const indexed = pvals.map((p,i) => ({p, i, isSignal: isSignal[i]}));
+  indexed.sort((a,b) => a.p - b.p);
+
+  // Assign ranks and compute BH threshold line
+  const results = indexed.map((item, idx) => {
+    const rank = idx + 1;
+    const bhLine = rank * fdrThreshold / n;
+    return {rank, rawP: item.p, bhLine, origIdx: item.i, isSignal: item.isSignal, isDiscovery: false};
+  });
+
+  // Step-up: find largest k where p(k) <= k*q/N
+  let maxK = -1;
+  for(let k=0; k<n; k++){
+    if(results[k].rawP <= results[k].bhLine){
+      maxK = k;
+    }
+  }
+
+  // Everything from rank 1 to maxK+1 is a discovery
+  if(maxK >= 0){
+    for(let k=0; k<=maxK; k++){
+      results[k].isDiscovery = true;
+    }
+  }
+
+  return results;
+}
+
+
+// ===== DRAWING UTILITIES =====
+function getCtx(id){const c=document.getElementById(id);c.width=c.width;return c.getContext('2d');}
+
+function drawHistogram(ctx,data,numBins,color,title,xLabel,lo,hi,overlayFn,opts={}){
+  const W=ctx.canvas.width,H=ctx.canvas.height;
+  const pad={l:55,r:15,t:35,b:40};
+  const plotW=W-pad.l-pad.r,plotH=H-pad.t-pad.b;
+  if(lo===undefined)lo=Math.min(...data);if(hi===undefined)hi=Math.max(...data);
+  if(hi===lo)hi=lo+1;
+  const binW=(hi-lo)/numBins;
+  const bins=new Array(numBins).fill(0);
+  for(const v of data){let idx=Math.floor((v-lo)/binW);if(idx>=numBins)idx=numBins-1;if(idx<0)idx=0;bins[idx]++;}
+  const maxBin=Math.max(...bins,1);
+  ctx.strokeStyle='#555';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(pad.l,pad.t);ctx.lineTo(pad.l,H-pad.b);ctx.lineTo(W-pad.r,H-pad.b);ctx.stroke();
+  ctx.fillStyle=color;
+  for(let i=0;i<numBins;i++){
+    const x=pad.l+(i/numBins)*plotW,w=plotW/numBins-1,h=(bins[i]/maxBin)*plotH;
+    ctx.fillRect(x,H-pad.b-h,w,h);
+  }
+  if(overlayFn){
+    ctx.strokeStyle='#e94560';ctx.lineWidth=2.5;ctx.beginPath();
+    for(let s=0;s<=300;s++){
+      const xVal=lo+(hi-lo)*s/300,density=overlayFn(xVal);
+      const yCount=density*data.length*binW;
+      const px=pad.l+(s/300)*plotW,py=H-pad.b-(yCount/maxBin)*plotH;
+      s===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
+    }
+    ctx.stroke();
+  }
+  // Vertical threshold line
+  if(opts.vline !== undefined){
+    const vx = pad.l+((opts.vline-lo)/(hi-lo))*plotW;
+    ctx.strokeStyle=opts.vlineColor||'#f39c12';ctx.lineWidth=2;ctx.setLineDash([6,4]);
+    ctx.beginPath();ctx.moveTo(vx,pad.t);ctx.lineTo(vx,H-pad.b);ctx.stroke();ctx.setLineDash([]);
+    if(opts.vlineLabel){
+      ctx.fillStyle=opts.vlineColor||'#f39c12';ctx.font='bold 11px Segoe UI';ctx.textAlign='left';
+      ctx.fillText(opts.vlineLabel,vx+4,pad.t+14);
+    }
+  }
+  ctx.fillStyle='#aab';ctx.font='11px Segoe UI';ctx.textAlign='center';
+  for(let i=0;i<=5;i++){const val=lo+(hi-lo)*i/5;ctx.fillText(val.toFixed(2),pad.l+(i/5)*plotW,H-pad.b+15);}
+  ctx.fillStyle='#eee';ctx.font='bold 12px Segoe UI';ctx.fillText(title,W/2,pad.t-10);
+  ctx.fillStyle='#aab';ctx.font='11px Segoe UI';ctx.fillText(xLabel||'',W/2,H-4);
+  // Y-axis counts
+  ctx.textAlign='right';
+  for(let i=0;i<=4;i++){
+    const v=Math.round(maxBin*i/4);
+    ctx.fillText(v.toString(),pad.l-5,H-pad.b-i/4*plotH+4);
+  }
+  return {pad,plotW,plotH,maxBin,bins,binW};
+}
+
+function drawScatter(ctx,xs,ys,color,title,xLabel,yLabel,opts={}){
+  const W=ctx.canvas.width,H=ctx.canvas.height;
+  const pad={l:55,r:15,t:35,b:40};
+  const plotW=W-pad.l-pad.r, plotH=H-pad.t-pad.b;
+  let xLo=opts.xLo??Math.min(...xs),xHi=opts.xHi??Math.max(...xs);
+  let yLo=opts.yLo??Math.min(...ys),yHi=opts.yHi??Math.max(...ys);
+  const xP=(xHi-xLo)*0.06||1,yP=(yHi-yLo)*0.06||1;
+  xLo-=xP;xHi+=xP;yLo-=yP;yHi+=yP;
+  function xToP(x){return pad.l+((x-xLo)/(xHi-xLo))*plotW;}
+  function yToP(y){return H-pad.b-((y-yLo)/(yHi-yLo))*plotH;}
+
+  ctx.strokeStyle='#555';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(pad.l,pad.t);ctx.lineTo(pad.l,H-pad.b);ctx.lineTo(W-pad.r,H-pad.b);ctx.stroke();
+  ctx.strokeStyle='#2a2a4a';ctx.lineWidth=0.5;
+  for(let i=1;i<5;i++){const py=pad.t+i/5*plotH;ctx.beginPath();ctx.moveTo(pad.l,py);ctx.lineTo(W-pad.r,py);ctx.stroke();}
+
+  ctx.fillStyle=color;
+  for(let i=0;i<xs.length;i++){ctx.beginPath();ctx.arc(xToP(xs[i]),yToP(ys[i]),opts.r||5,0,2*Math.PI);ctx.fill();}
+
+  ctx.fillStyle='#aab';ctx.font='11px Segoe UI';ctx.textAlign='center';
+  for(let i=0;i<=5;i++){const v=xLo+(xHi-xLo)*i/5;ctx.fillText(v.toFixed(1),pad.l+(i/5)*plotW,H-pad.b+15);}
+  ctx.textAlign='right';
+  for(let i=0;i<=4;i++){const v=yLo+(yHi-yLo)*i/4;ctx.fillText(v.toFixed(1),pad.l-5,H-pad.b-i/4*plotH+4);}
+  ctx.fillStyle='#eee';ctx.font='bold 12px Segoe UI';ctx.textAlign='center';
+  ctx.fillText(title,W/2,pad.t-10);
+  ctx.fillStyle='#aab';ctx.font='11px Segoe UI';
+  ctx.fillText(xLabel||'',W/2,H-4);
+  ctx.save();ctx.translate(12,H/2);ctx.rotate(-Math.PI/2);ctx.fillText(yLabel||'',0,0);ctx.restore();
+  return {xLo,xHi,yLo,yHi,xToP,yToP,pad,plotW,plotH};
+}
+
+
+// ===== SECTION NAV =====
+function showSection(id){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
+  event.target.classList.add('active');
+}
+
+
+// ===== SECTION 1: P-VALUE DISTRIBUTION UNDER NULL =====
+function runNullPvals(){
+  const N = +document.getElementById('nullN').value;
+  const alpha = +document.getElementById('nullAlpha').value;
+
+  // All null: p-values are uniform
+  const pvals = [];
+  for(let i=0; i<N; i++) pvals.push(Math.random());
+
+  const ctx = getCtx('nullCanvas');
+  const numBins = 50;
+
+  // Draw histogram
+  drawHistogram(ctx, pvals, numBins, 'rgba(79,195,247,0.6)',
+    `P-value Distribution Under the Null (${N.toLocaleString()} genes, all null)`,
+    'P-value', 0, 1,
+    function(x){ return 1; }, // uniform density = 1
+    {vline: alpha, vlineColor: '#e94560', vlineLabel: `\u03B1 = ${alpha}`}
+  );
+
+  // Count below threshold
+  const belowAlpha = pvals.filter(p => p < alpha).length;
+  const expected = Math.round(N * alpha);
+
+  document.getElementById('nullResult').innerHTML =
+    `<b>Results:</b>\n`+
+    `Total genes tested: ${N.toLocaleString()}\n`+
+    `Significance threshold (\u03B1): ${alpha}\n\n`+
+    `Genes with p < ${alpha}: <b>${belowAlpha.toLocaleString()}</b>\n`+
+    `Expected by chance: ${expected.toLocaleString()} (${(alpha*100).toFixed(1)}% of ${N.toLocaleString()})\n\n`+
+    `Every single one of these ${belowAlpha.toLocaleString()} "significant" genes is a FALSE POSITIVE!\n`+
+    `The null is true for all genes, yet we'd incorrectly reject ${belowAlpha.toLocaleString()} of them.\n\n`+
+    `Red line = theoretical uniform density (what we expect when H0 is true)`;
+}
+
+
+// ===== SECTION 2: BONFERRONI CORRECTION =====
+function runBonferroni(){
+  const N = +document.getElementById('bonfN').value;
+  const alpha = +document.getElementById('bonfAlpha').value;
+  const nTP = +document.getElementById('bonfTP').value;
+  const eff = +document.getElementById('bonfEff').value;
+
+  const {pvals, isSignal} = generatePValues(N, nTP, eff);
+  const bonfThreshold = alpha / N;
+
+  // Sort for the first plot
+  const indexed = pvals.map((p,i) => ({p, isSignal: isSignal[i]}));
+  indexed.sort((a,b) => a.p - b.p);
+
+  // === Canvas 1: Sorted p-values with threshold lines (log scale y-axis) ===
+  const ctx = getCtx('bonfCanvas');
+  const W=ctx.canvas.width, H=ctx.canvas.height;
+  const pad={l:80,r:20,t:40,b:45};
+  const plotW=W-pad.l-pad.r, plotH=H-pad.t-pad.b;
+
+  // Only show enough points to see the interesting region
+  const showN = Math.min(2000, N);
+  // Log scale: use -log10 so small p-values are at the top
+  const minP = Math.max(indexed[0].p, 1e-300);
+  const maxP = Math.min(indexed[showN-1].p * 1.2, 1);
+  const logMin = -Math.log10(maxP);   // bottom of plot (large p)
+  const logMax = -Math.log10(minP);   // top of plot (small p)
+
+  function xToP(x){return pad.l+(x/showN)*plotW;}
+  function yToP(p){
+    const lp = -Math.log10(Math.max(p, 1e-300));
+    return H-pad.b-((lp-logMin)/(logMax-logMin))*plotH;
+  }
+
+  // Axes
+  ctx.strokeStyle='#555';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(pad.l,pad.t);ctx.lineTo(pad.l,H-pad.b);ctx.lineTo(W-pad.r,H-pad.b);ctx.stroke();
+
+  // Grid lines at nice log10 intervals
+  ctx.strokeStyle='#2a2a4a';ctx.lineWidth=0.5;
+  const logFloor = Math.floor(logMin), logCeil = Math.ceil(logMax);
+  for(let e=logFloor; e<=logCeil; e++){
+    const pVal = Math.pow(10, -e);
+    if(pVal >= maxP || pVal <= minP*0.5) continue;
+    const py = yToP(pVal);
+    ctx.beginPath();ctx.moveTo(pad.l,py);ctx.lineTo(W-pad.r,py);ctx.stroke();
+  }
+
+  // Raw threshold line (alpha)
+  if(alpha <= maxP && alpha >= minP*0.5){
+    ctx.strokeStyle='#f39c12';ctx.lineWidth=2;ctx.setLineDash([8,4]);
+    ctx.beginPath();ctx.moveTo(pad.l,yToP(alpha));ctx.lineTo(W-pad.r,yToP(alpha));ctx.stroke();ctx.setLineDash([]);
+    ctx.fillStyle='#f39c12';ctx.font='bold 11px Segoe UI';ctx.textAlign='left';
+    ctx.fillText(`Raw \u03B1 = ${alpha}`,W-pad.r-120,yToP(alpha)+14);
+  }
+
+  // Bonferroni threshold line
+  ctx.strokeStyle='#2ecc71';ctx.lineWidth=2;ctx.setLineDash([4,4]);
+  ctx.beginPath();ctx.moveTo(pad.l,yToP(bonfThreshold));ctx.lineTo(W-pad.r,yToP(bonfThreshold));ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle='#2ecc71';ctx.font='bold 11px Segoe UI';ctx.textAlign='left';
+  ctx.fillText(`Bonferroni = ${bonfThreshold.toExponential(2)}`,pad.l+10,yToP(bonfThreshold)-6);
+
+  // Plot p-values as dots
+  for(let i=0; i<showN; i++){
+    const item = indexed[i];
+    if(item.isSignal){
+      ctx.fillStyle = item.p < bonfThreshold ? 'rgba(46,204,113,0.8)' : 'rgba(243,156,18,0.6)';
+    } else {
+      ctx.fillStyle = item.p < bonfThreshold ? 'rgba(233,69,96,0.8)' : 'rgba(79,195,247,0.5)';
+    }
+    ctx.beginPath();ctx.arc(xToP(i), yToP(item.p), 2, 0, 2*Math.PI);ctx.fill();
+  }
+
+  // Axis labels
+  ctx.fillStyle='#aab';ctx.font='11px Segoe UI';ctx.textAlign='center';
+  for(let i=0;i<=5;i++){const v=Math.round(showN*i/5);ctx.fillText(v.toString(),pad.l+(i/5)*plotW,H-pad.b+15);}
+  ctx.textAlign='right';
+  for(let e=logFloor; e<=logCeil; e++){
+    const pVal = Math.pow(10, -e);
+    if(pVal > maxP || pVal < minP*0.5) continue;
+    const py = yToP(pVal);
+    const label = e<=0 ? pVal.toFixed(1) : e<=4 ? pVal.toFixed(e) : '1e-'+e;
+    ctx.fillText(label, pad.l-5, py+4);
+  }
+  ctx.fillStyle='#eee';ctx.font='bold 12px Segoe UI';ctx.textAlign='center';
+  ctx.fillText(`Sorted P-Values \u2014 log scale (showing smallest ${showN.toLocaleString()} of ${N.toLocaleString()})`,W/2,pad.t-12);
+  ctx.fillStyle='#aab';ctx.font='11px Segoe UI';
+  ctx.fillText('Rank (sorted by p-value)',W/2,H-4);
+  ctx.save();ctx.translate(14,H/2);ctx.rotate(-Math.PI/2);ctx.fillText('P-value (log scale)',0,0);ctx.restore();
+
+  // Legend
+  ctx.font='11px Segoe UI';ctx.textAlign='left';
+  const lx=pad.l+plotW-200, ly=pad.t+16;
+  ctx.fillStyle='rgba(46,204,113,0.8)';ctx.fillRect(lx,ly,10,10);
+  ctx.fillStyle='#aab';ctx.fillText('True positive (detected)',lx+14,ly+9);
+  ctx.fillStyle='rgba(243,156,18,0.6)';ctx.fillRect(lx,ly+14,10,10);
+  ctx.fillStyle='#aab';ctx.fillText('True positive (missed)',lx+14,ly+23);
+  ctx.fillStyle='rgba(233,69,96,0.8)';ctx.fillRect(lx,ly+28,10,10);
+  ctx.fillStyle='#aab';ctx.fillText('False positive',lx+14,ly+37);
+  ctx.fillStyle='rgba(79,195,247,0.5)';ctx.fillRect(lx,ly+42,10,10);
+  ctx.fillStyle='#aab';ctx.fillText('True negative',lx+14,ly+51);
+
+  // Statistics
+  const rawSig = pvals.filter(p => p < alpha).length;
+  const bonfSig = pvals.filter(p => p * N < alpha).length;
+  const rawFP = pvals.filter((p,i) => p < alpha && !isSignal[i]).length;
+  const rawTP = pvals.filter((p,i) => p < alpha && isSignal[i]).length;
+  const bonfFP = pvals.filter((p,i) => p * N < alpha && !isSignal[i]).length;
+  const bonfTP = pvals.filter((p,i) => p * N < alpha && isSignal[i]).length;
+
+  document.getElementById('bonfResult').innerHTML =
+    `<b>Bonferroni threshold</b> = \u03B1 / N = ${alpha} / ${N.toLocaleString()} = ${bonfThreshold.toExponential(3)}\n\n`+
+    `<b>No correction (raw p < ${alpha}):</b>\n`+
+    `  Discoveries: ${rawSig.toLocaleString()}  (TP: ${rawTP.toLocaleString()}, FP: ${rawFP.toLocaleString()})\n`+
+    `  False discovery rate: ${rawSig>0?(rawFP/rawSig*100).toFixed(1):'0.0'}%\n`+
+    `  Power (sensitivity): ${nTP>0?(rawTP/nTP*100).toFixed(1):'N/A'}%\n\n`+
+    `<b>Bonferroni (adjusted p < ${alpha}):</b>\n`+
+    `  Discoveries: ${bonfSig.toLocaleString()}  (TP: ${bonfTP.toLocaleString()}, FP: ${bonfFP.toLocaleString()})\n`+
+    `  False discovery rate: ${bonfSig>0?(bonfFP/bonfSig*100).toFixed(1):'0.0'}%\n`+
+    `  Power (sensitivity): ${nTP>0?(bonfTP/nTP*100).toFixed(1):'N/A'}%\n\n`+
+    `Bonferroni killed ${rawFP-bonfFP} false positives but also missed ${rawTP-bonfTP} true positives.`;
+}
+
+
+// ===== SECTION 3: BENJAMINI-HOCHBERG FDR =====
+function runBH(){
+  const N = +document.getElementById('bhN').value;
+  const nTP = +document.getElementById('bhTP').value;
+  const fdr = +document.getElementById('bhFDR').value;
+  const eff = +document.getElementById('bhEff').value;
+
+  const {pvals, isSignal} = generatePValues(N, nTP, eff);
+  const results = bhProcedure(pvals, isSignal, fdr);
+
+  const discoveries = results.filter(r => r.isDiscovery);
+  const truePos = discoveries.filter(r => r.isSignal).length;
+  const falsePos = discoveries.filter(r => !r.isSignal).length;
+  const actualFDR = discoveries.length > 0 ? falsePos / discoveries.length : 0;
+
+  // === BH Plot: sorted p-values vs rank with BH line (log scale y-axis) ===
+  const ctx = getCtx('bhCanvas');
+  const W=ctx.canvas.width, H=ctx.canvas.height;
+  const pad={l:80,r:20,t:40,b:45};
+  const plotW=W-pad.l-pad.r, plotH=H-pad.t-pad.b;
+
+  // Show enough points to see the interesting region
+  const showN = Math.min(N, Math.max(500, discoveries.length * 3, nTP * 2));
+  const minP = Math.max(results[0].rawP, 1e-300);
+  const maxP = results[showN-1].rawP * 1.2;
+  const logMin = -Math.log10(maxP);   // bottom (large p)
+  const logMax = -Math.log10(minP);   // top (small p)
+
+  function xToP(x){return pad.l+(x/showN)*plotW;}
+  function yToP(p){
+    const lp = -Math.log10(Math.max(p, 1e-300));
+    return H-pad.b-((lp-logMin)/(logMax-logMin))*plotH;
+  }
+
+  // Axes
+  ctx.strokeStyle='#555';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(pad.l,pad.t);ctx.lineTo(pad.l,H-pad.b);ctx.lineTo(W-pad.r,H-pad.b);ctx.stroke();
+
+  // Grid lines at powers of 10
+  ctx.strokeStyle='#2a2a4a';ctx.lineWidth=0.5;
+  const logFloor = Math.floor(logMin), logCeil = Math.ceil(logMax);
+  for(let e=logFloor; e<=logCeil; e++){
+    const pVal = Math.pow(10, -e);
+    if(pVal >= maxP || pVal <= minP*0.5) continue;
+    const py = yToP(pVal);
+    ctx.beginPath();ctx.moveTo(pad.l,py);ctx.lineTo(W-pad.r,py);ctx.stroke();
+  }
+
+  // BH line: y = k * fdr / N (draw as curve in log space)
+  ctx.strokeStyle='#2ecc71';ctx.lineWidth=2.5;
+  ctx.beginPath();
+  let bhStarted = false;
+  for(let k=1; k<=showN; k+=Math.max(1,Math.floor(showN/500))){
+    const bhP = k * fdr / N;
+    if(bhP < minP*0.5 || bhP > maxP) continue;
+    const px = xToP(k), py = yToP(bhP);
+    if(!bhStarted){ctx.moveTo(px,py);bhStarted=true;} else ctx.lineTo(px,py);
+  }
+  ctx.stroke();
+  // Label the BH line
+  const labelK = Math.round(showN * 0.7);
+  const labelBhP = labelK * fdr / N;
+  if(labelBhP < maxP && labelBhP > minP){
+    ctx.fillStyle='#2ecc71';ctx.font='bold 11px Segoe UI';ctx.textAlign='left';
+    ctx.fillText(`BH line: k\u00D7FDR/N`, xToP(labelK)+5, yToP(labelBhP)-8);
+  }
+
+  // Cutoff line (vertical at last discovery)
+  if(discoveries.length > 0){
+    const cutoffRank = discoveries.length;
+    ctx.strokeStyle='rgba(233,69,96,0.5)';ctx.lineWidth=1.5;ctx.setLineDash([4,4]);
+    ctx.beginPath();ctx.moveTo(xToP(cutoffRank),pad.t);ctx.lineTo(xToP(cutoffRank),H-pad.b);ctx.stroke();ctx.setLineDash([]);
+    ctx.fillStyle='#e94560';ctx.font='bold 11px Segoe UI';ctx.textAlign='left';
+    ctx.fillText(`k = ${cutoffRank} discoveries`, xToP(cutoffRank)+4, pad.t+14);
+  }
+
+  // Plot p-values as dots (subsample if too many)
+  const plotStep = Math.max(1, Math.floor(showN / 3000));
+  for(let i=0; i<showN; i+=plotStep){
+    const r = results[i];
+    if(r.isDiscovery){
+      ctx.fillStyle = r.isSignal ? 'rgba(46,204,113,0.8)' : 'rgba(233,69,96,0.8)';
+    } else {
+      ctx.fillStyle = r.isSignal ? 'rgba(243,156,18,0.6)' : 'rgba(79,195,247,0.5)';
+    }
+    ctx.beginPath();ctx.arc(xToP(r.rank), yToP(r.rawP), 2.5, 0, 2*Math.PI);ctx.fill();
+  }
+
+  // Axis labels
+  ctx.fillStyle='#aab';ctx.font='11px Segoe UI';ctx.textAlign='center';
+  for(let i=0;i<=5;i++){const v=Math.round(showN*i/5);ctx.fillText(v.toLocaleString(),pad.l+(i/5)*plotW,H-pad.b+15);}
+  ctx.textAlign='right';
+  for(let e=logFloor; e<=logCeil; e++){
+    const pVal = Math.pow(10, -e);
+    if(pVal > maxP || pVal < minP*0.5) continue;
+    const py = yToP(pVal);
+    const label = e<=0 ? pVal.toFixed(1) : e<=4 ? pVal.toFixed(e) : '1e-'+e;
+    ctx.fillText(label, pad.l-5, py+4);
+  }
+  ctx.fillStyle='#eee';ctx.font='bold 12px Segoe UI';ctx.textAlign='center';
+  ctx.fillText(`BH Procedure: Sorted P-Values vs BH Line \u2014 log scale (FDR = ${fdr})`,W/2,pad.t-12);
+  ctx.fillStyle='#aab';ctx.font='11px Segoe UI';
+  ctx.fillText('Rank (k)',W/2,H-4);
+  ctx.save();ctx.translate(14,H/2);ctx.rotate(-Math.PI/2);ctx.fillText('P-value (log scale)',0,0);ctx.restore();
+
+  // Legend
+  ctx.font='11px Segoe UI';ctx.textAlign='left';
+  const lx=pad.l+10, ly=pad.t+10;
+  ctx.fillStyle='rgba(46,204,113,0.8)';ctx.fillRect(lx,ly,10,10);
+  ctx.fillStyle='#aab';ctx.fillText('Discovery (true positive)',lx+14,ly+9);
+  ctx.fillStyle='rgba(233,69,96,0.8)';ctx.fillRect(lx,ly+14,10,10);
+  ctx.fillStyle='#aab';ctx.fillText('Discovery (false positive)',lx+14,ly+23);
+  ctx.fillStyle='rgba(243,156,18,0.6)';ctx.fillRect(lx,ly+28,10,10);
+  ctx.fillStyle='#aab';ctx.fillText('Missed true positive',lx+14,ly+37);
+  ctx.fillStyle='rgba(79,195,247,0.5)';ctx.fillRect(lx,ly+42,10,10);
+  ctx.fillStyle='#aab';ctx.fillText('True negative (not called)',lx+14,ly+51);
+
+  // === Step-by-step display as spreadsheet table ===
+  function fmtP(p){ return p < 0.0001 ? p.toExponential(4) : p.toFixed(6); }
+  function statusCell(r){
+    if(r.isDiscovery && r.isSignal) return '<td style="background:rgba(46,204,113,0.2);color:#2ecc71;font-weight:bold;">TRUE POS</td>';
+    if(r.isDiscovery && !r.isSignal) return '<td style="background:rgba(233,69,96,0.2);color:#e94560;font-weight:bold;">FALSE POS</td>';
+    if(!r.isDiscovery && r.isSignal) return '<td style="background:rgba(243,156,18,0.15);color:#f39c12;">MISSED</td>';
+    return '<td style="color:var(--muted);">—</td>';
+  }
+  function bhRow(r, highlight){
+    const belowLine = r.rawP <= r.bhLine;
+    const rowStyle = highlight ? ' style="background:rgba(233,69,96,0.15);border:1px solid #e94560;"' : '';
+    return `<tr${rowStyle}>`+
+      `<td>${r.rank}</td>`+
+      `<td>${fmtP(r.rawP)}</td>`+
+      `<td>${fmtP(r.bhLine)}</td>`+
+      `<td style="color:${belowLine?'#2ecc71':'#e94560'};font-weight:bold;">${belowLine?'YES':'no'}</td>`+
+      `<td style="color:${r.isSignal?'#f39c12':'var(--muted)'};">${r.isSignal?'YES':'no'}</td>`+
+      statusCell(r)+
+      `</tr>`;
+  }
+
+  let stepHTML = `<table style="width:100%;border-collapse:collapse;font-size:0.85rem;">`+
+    `<thead><tr style="background:var(--accent);"><th>Rank (k)</th><th>Raw P-value</th><th>k &times; FDR / N</th><th>P &le; BH line?</th><th>True signal?</th><th>Status</th></tr></thead><tbody>`;
+
+  const showSteps = Math.min(20, results.length);
+  for(let i=0; i<showSteps; i++) stepHTML += bhRow(results[i], false);
+
+  if(discoveries.length > 20){
+    stepHTML += `<tr><td colspan="6" style="text-align:center;color:var(--muted);font-style:italic;padding:0.5rem;">… ${discoveries.length - 20} more discoveries …</td></tr>`;
+  }
+
+  // Show the boundary region
+  if(discoveries.length > 0 && discoveries.length < results.length){
+    const boundary = discoveries.length - 1;
+    if(boundary >= 20){
+      stepHTML += `<tr><td colspan="6" style="text-align:center;color:var(--warn);font-weight:bold;padding:0.6rem 0.4rem;border-top:2px solid var(--warn);">Boundary (cutoff region)</td></tr>`;
+      const start = Math.max(0, boundary - 2);
+      const end = Math.min(results.length - 1, boundary + 3);
+      for(let i=start; i<=end; i++) stepHTML += bhRow(results[i], i === boundary);
+    }
+  }
+
+  stepHTML += `</tbody></table>`;
+  document.getElementById('bhSteps').innerHTML = stepHTML;
+
+  // Result box
+  const missedTP = results.filter(r => !r.isDiscovery && r.isSignal).length;
+  document.getElementById('bhResult').innerHTML =
+    `<b>BH Procedure Results (FDR threshold = ${fdr}):</b>\n\n`+
+    `Total genes: ${N.toLocaleString()}  (${nTP.toLocaleString()} with real signal, ${(N-nTP).toLocaleString()} null)\n\n`+
+    `<b>Discoveries:</b> ${discoveries.length.toLocaleString()}\n`+
+    `  True positives found: ${truePos.toLocaleString()} of ${nTP.toLocaleString()} (power = ${nTP>0?(truePos/nTP*100).toFixed(1):'N/A'}%)\n`+
+    `  False positives: ${falsePos.toLocaleString()}\n`+
+    `  Actual FDR: ${(actualFDR*100).toFixed(1)}% (target: ${(fdr*100).toFixed(0)}%)\n\n`+
+    `<b>Missed true positives:</b> ${missedTP.toLocaleString()} (not enough signal to cross BH line)\n\n`+
+    `<b>Note:</b> At rank k=1, BH threshold = 1 \u00D7 ${fdr} / ${N.toLocaleString()} = ${(fdr/N).toExponential(2)} = Bonferroni threshold!\n`+
+    `But at higher ranks, BH becomes progressively more lenient.\n\n`+
+    `N \u00D7 p = expected false positives at a given p-value threshold\n`+
+    `k = number of genes actually observed at that rank\n`+
+    `N \u00D7 p / k = expected proportion of false discoveries = FDR estimate`;
+}
+
+
+// ===== SECTION 4: COMPARE ALL METHODS =====
+function runCompare(){
+  const N = +document.getElementById('cmpN').value;
+  const nTP = +document.getElementById('cmpTP').value;
+  const eff = +document.getElementById('cmpEff').value;
+  const alpha = +document.getElementById('cmpAlpha').value;
+
+  const {pvals, isSignal} = generatePValues(N, nTP, eff);
+
+  // No correction
+  const rawDisc = pvals.map((p,i) => ({p, isSignal: isSignal[i]})).filter(x => x.p < alpha);
+  const rawTP = rawDisc.filter(x => x.isSignal).length;
+  const rawFP = rawDisc.filter(x => !x.isSignal).length;
+  const rawFDR = rawDisc.length > 0 ? rawFP / rawDisc.length : 0;
+  const rawPower = nTP > 0 ? rawTP / nTP : 0;
+
+  // Bonferroni
+  const bonfThresh = alpha / N;
+  const bonfDisc = pvals.map((p,i) => ({p, isSignal: isSignal[i]})).filter(x => x.p < bonfThresh);
+  const bonfTP = bonfDisc.filter(x => x.isSignal).length;
+  const bonfFP = bonfDisc.filter(x => !x.isSignal).length;
+  const bonfFDR = bonfDisc.length > 0 ? bonfFP / bonfDisc.length : 0;
+  const bonfPower = nTP > 0 ? bonfTP / nTP : 0;
+
+  // BH FDR
+  const bhResults = bhProcedure(pvals, isSignal, alpha);
+  const bhDisc = bhResults.filter(r => r.isDiscovery);
+  const bhTP = bhDisc.filter(r => r.isSignal).length;
+  const bhFP = bhDisc.filter(r => !r.isSignal).length;
+  const bhFDR = bhDisc.length > 0 ? bhFP / bhDisc.length : 0;
+  const bhPower = nTP > 0 ? bhTP / nTP : 0;
+
+  // === Canvas: Stacked bar chart ===
+  const ctx = getCtx('cmpCanvas');
+  const W=ctx.canvas.width, H=ctx.canvas.height;
+  const pad={l:100,r:30,t:40,b:50};
+  const plotW=W-pad.l-pad.r, plotH=H-pad.t-pad.b;
+
+  const methods = [
+    {name: 'No Correction', tp: rawTP, fp: rawFP, total: rawDisc.length, color_tp: '#2ecc71', color_fp: '#e94560'},
+    {name: 'BH FDR', tp: bhTP, fp: bhFP, total: bhDisc.length, color_tp: '#2ecc71', color_fp: '#e94560'},
+    {name: 'Bonferroni', tp: bonfTP, fp: bonfFP, total: bonfDisc.length, color_tp: '#2ecc71', color_fp: '#e94560'}
+  ];
+
+  const maxDisc = Math.max(rawDisc.length, bhDisc.length, bonfDisc.length, 1);
+  const barHeight = plotH / 5;
+  const barGap = plotH / 5;
+
+  // Axes
+  ctx.strokeStyle='#555';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(pad.l,pad.t);ctx.lineTo(pad.l,H-pad.b);ctx.lineTo(W-pad.r,H-pad.b);ctx.stroke();
+
+  // Grid
+  ctx.strokeStyle='#2a2a4a';ctx.lineWidth=0.5;
+  for(let i=1;i<=5;i++){
+    const gx = pad.l + (i/5)*plotW;
+    ctx.beginPath();ctx.moveTo(gx,pad.t);ctx.lineTo(gx,H-pad.b);ctx.stroke();
+  }
+
+  for(let m=0; m<3; m++){
+    const method = methods[m];
+    const y = pad.t + m * (barHeight + barGap) + barGap/2;
+
+    // True positives bar
+    const tpWidth = (method.tp / maxDisc) * plotW;
+    ctx.fillStyle = method.color_tp;
+    ctx.fillRect(pad.l, y, tpWidth, barHeight);
+
+    // False positives bar (stacked)
+    const fpWidth = (method.fp / maxDisc) * plotW;
+    ctx.fillStyle = method.color_fp;
+    ctx.fillRect(pad.l + tpWidth, y, fpWidth, barHeight);
+
+    // Border
+    ctx.strokeStyle = '#888';ctx.lineWidth=1;
+    ctx.strokeRect(pad.l, y, tpWidth + fpWidth, barHeight);
+
+    // Method label
+    ctx.fillStyle='#eee';ctx.font='bold 12px Segoe UI';ctx.textAlign='right';
+    ctx.fillText(method.name, pad.l - 8, y + barHeight/2 + 4);
+
+    // Count labels on bars
+    ctx.font='bold 11px Consolas';ctx.textAlign='left';
+    if(tpWidth > 40){
+      ctx.fillStyle='#111';
+      ctx.fillText(`TP: ${method.tp}`, pad.l + 4, y + barHeight/2 + 4);
+    }
+    if(fpWidth > 40){
+      ctx.fillStyle='#fff';
+      ctx.fillText(`FP: ${method.fp}`, pad.l + tpWidth + 4, y + barHeight/2 + 4);
+    }
+    // Total count at end of bar
+    ctx.fillStyle='#eee';ctx.font='11px Segoe UI';ctx.textAlign='left';
+    ctx.fillText(`${method.total.toLocaleString()} total`, pad.l + tpWidth + fpWidth + 8, y + barHeight/2 + 4);
+  }
+
+  // X-axis ticks
+  ctx.fillStyle='#aab';ctx.font='11px Segoe UI';ctx.textAlign='center';
+  for(let i=0;i<=5;i++){
+    const v=Math.round(maxDisc*i/5);
+    ctx.fillText(v.toLocaleString(),pad.l+(i/5)*plotW,H-pad.b+15);
+  }
+  ctx.fillText('Number of Discoveries',W/2,H-pad.b+32);
+
+  // Title
+  ctx.fillStyle='#eee';ctx.font='bold 12px Segoe UI';ctx.textAlign='center';
+  ctx.fillText(`Method Comparison (${N.toLocaleString()} genes, ${nTP.toLocaleString()} true signals, effect = ${eff})`,W/2,pad.t-12);
+
+  // Legend
+  ctx.font='11px Segoe UI';ctx.textAlign='left';
+  ctx.fillStyle='#2ecc71';ctx.fillRect(pad.l,H-pad.b+20,12,12);
+  ctx.fillStyle='#aab';ctx.fillText('True Positives',pad.l+16,H-pad.b+30);
+  ctx.fillStyle='#e94560';ctx.fillRect(pad.l+130,H-pad.b+20,12,12);
+  ctx.fillStyle='#aab';ctx.fillText('False Positives',pad.l+146,H-pad.b+30);
+
+  // === Comparison table ===
+  document.getElementById('cmpTable').innerHTML =
+    `<table class="compare-table">` +
+    `<tr><th>Method</th><th>Discoveries</th><th>True Pos</th><th>False Pos</th><th>FDR</th><th>Power</th></tr>` +
+    `<tr>` +
+    `<td>No Correction (p &lt; ${alpha})</td>` +
+    `<td>${rawDisc.length.toLocaleString()}</td>` +
+    `<td class="good">${rawTP.toLocaleString()}</td>` +
+    `<td class="bad">${rawFP.toLocaleString()}</td>` +
+    `<td class="bad">${(rawFDR*100).toFixed(1)}%</td>` +
+    `<td class="good">${(rawPower*100).toFixed(1)}%</td>` +
+    `</tr>` +
+    `<tr>` +
+    `<td>BH FDR (q &lt; ${alpha})</td>` +
+    `<td>${bhDisc.length.toLocaleString()}</td>` +
+    `<td class="good">${bhTP.toLocaleString()}</td>` +
+    `<td>${bhFP.toLocaleString()}</td>` +
+    `<td>${(bhFDR*100).toFixed(1)}%</td>` +
+    `<td>${(bhPower*100).toFixed(1)}%</td>` +
+    `</tr>` +
+    `<tr>` +
+    `<td>Bonferroni (p &lt; ${bonfThresh.toExponential(2)})</td>` +
+    `<td>${bonfDisc.length.toLocaleString()}</td>` +
+    `<td>${bonfTP.toLocaleString()}</td>` +
+    `<td class="good">${bonfFP.toLocaleString()}</td>` +
+    `<td class="good">${(bonfFDR*100).toFixed(1)}%</td>` +
+    `<td class="bad">${(bonfPower*100).toFixed(1)}%</td>` +
+    `</tr>` +
+    `</table>` +
+    `\n<b>Summary:</b>\n`+
+    `\u2022 No correction: finds ${rawTP} of ${nTP} true signals but has ${rawFP} false positives (FDR = ${(rawFDR*100).toFixed(0)}%)\n`+
+    `\u2022 BH FDR: finds ${bhTP} of ${nTP} true signals with ${bhFP} false positives (FDR = ${(bhFDR*100).toFixed(1)}%)\n`+
+    `\u2022 Bonferroni: finds ${bonfTP} of ${nTP} true signals with only ${bonfFP} false positives (FDR = ${(bonfFDR*100).toFixed(1)}%)\n\n`+
+    `In R: p.adjust(pValues, method="BH") or p.adjust(pValues, method="bonferroni")`;
+}
+
+
+</script>
+</body>
+</html>
